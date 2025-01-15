@@ -72,6 +72,9 @@ dependencies {
     // THINKLET向けのSDKを追加
     implementation(thinkletLibs.sdk.audio)
 
+    // https://github.com/FairyDevicesRD/thinklet.camerax.vision
+    implementation(project(":vision"))
+
     testImplementation(libs.junit)
 
     debugImplementation(libs.androidx.ui.tooling)
