@@ -7,6 +7,7 @@ import androidx.annotation.GuardedBy
 import androidx.annotation.MainThread
 import androidx.annotation.RequiresPermission
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.core.UseCase
 import androidx.camera.core.UseCaseGroup
@@ -101,6 +102,7 @@ internal class ThinkletRecorder private constructor(
          *
          * @param lifecycleOwner カメラのライフサイクルと紐付ける[LifecycleOwner]
          * @param mic 使用するTHINKLET独自のマイク機能
+         * @param analyzer カメラAnalyzer
          * @param previewSurfaceProvider プレビューを表示する[PreviewView]から取得した[Preview.SurfaceProvider]
          * @param recordEventListener CameraX側からの[VideoRecordEvent]イベントを受け取るリスナー
          * @param recorderExecutor [recordEventListener]の実行スレッドを指定する[ExecutorService]
@@ -110,6 +112,7 @@ internal class ThinkletRecorder private constructor(
             context: Context,
             lifecycleOwner: LifecycleOwner,
             mic: ThinkletMic?,
+            analyzer: ImageAnalysis.Analyzer?,
             previewSurfaceProvider: Preview.SurfaceProvider? = null,
             recordEventListener: (VideoRecordEvent) -> Unit = {},
             recorderExecutor: ExecutorService = Executors.newSingleThreadExecutor()
@@ -123,6 +126,12 @@ internal class ThinkletRecorder private constructor(
                 .build()
             val videoCaptureUseCase = VideoCapture.Builder(recorder).build()
 
+            // Vision機能用のAnalyzer
+            val analyzerUseCase = if (analyzer != null) {
+                AnalyzerConfigure(analyzer).build()
+            } else {
+                null
+            }
             val previewUseCase = if (previewSurfaceProvider != null) {
                 Preview.Builder().build().apply {
                     surfaceProvider = previewSurfaceProvider
@@ -133,6 +142,7 @@ internal class ThinkletRecorder private constructor(
 
             val useCaseGroup = UseCaseGroup.Builder()
                 .addUseCase(videoCaptureUseCase)
+                .addUseCaseIfPresent(analyzerUseCase)
                 .addUseCaseIfPresent(previewUseCase)
                 .build()
 

@@ -2,6 +2,7 @@ package com.example.fd.camerax.recorder
 
 import ai.fd.thinklet.camerax.mic.ThinkletMics
 import ai.fd.thinklet.camerax.mic.xfe.Xfe
+import ai.fd.thinklet.camerax.vision.Vision
 import android.annotation.SuppressLint
 import android.content.Context
 import android.hardware.camera2.CameraCharacteristics
@@ -39,7 +40,8 @@ import java.util.Locale
 @Stable
 class RecorderState(
     private val context: Context,
-    private val lifecycleOwner: LifecycleOwner
+    private val lifecycleOwner: LifecycleOwner,
+    enableVision: Boolean = true
 ) {
     val isLandscapeCamera: Boolean = isLandscape(context)
 
@@ -54,6 +56,8 @@ class RecorderState(
     @GuardedBy("recorderMutex")
     private var recorder: ThinkletRecorder? = null
     private val recorderMutex: Mutex = Mutex()
+
+    private val vision: Vision? = if (enableVision) Vision() else null
 
     init {
         lifecycleOwner.lifecycleScope.launch {
@@ -81,6 +85,16 @@ class RecorderState(
                 }
             }
         }
+        lifecycleOwner.lifecycleScope.launch {
+            lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                vision?.start(8080)
+                try {
+                    awaitCancellation()
+                } finally {
+                    vision?.stop()
+                }
+            }
+        }
     }
 
     fun registerSurfaceProvider(surfaceProvider: Preview.SurfaceProvider) {
@@ -93,6 +107,7 @@ class RecorderState(
                     context = context,
                     lifecycleOwner = lifecycleOwner,
                     mic = ThinkletMics.Xfe(checkNotNull(context.getSystemService<AudioManager>())),
+                    analyzer = vision,
                     previewSurfaceProvider = surfaceProvider,
                     recordEventListener = ::handleRecordEvent
                 )
