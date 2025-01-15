@@ -1,4 +1,4 @@
-package com.example.fd.camerax.recorder.compose
+package com.example.fd.video.recorder.compose
 
 import android.util.Size
 import android.view.View
@@ -7,8 +7,8 @@ import androidx.camera.view.PreviewView
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
-import com.example.fd.camerax.recorder.BuildConfig
-import com.example.fd.camerax.recorder.RecorderState
+import com.example.fd.video.recorder.BuildConfig
+import com.example.fd.video.recorder.RecorderState
 
 @Composable
 fun CameraPreview(

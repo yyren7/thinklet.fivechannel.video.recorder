@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.fd.camerax.recorder"
+    namespace = "com.example.fd.video.recorder"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.fd.camerax.recorder"
+        applicationId = "com.example.fd.video.recorder"
         minSdk = 27
         targetSdk = 35
         versionCode = 1

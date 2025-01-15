@@ -1,4 +1,4 @@
-package com.example.fd.camerax.recorder.camerax
+package com.example.fd.video.recorder.camerax
 
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.resolutionselector.AspectRatioStrategy

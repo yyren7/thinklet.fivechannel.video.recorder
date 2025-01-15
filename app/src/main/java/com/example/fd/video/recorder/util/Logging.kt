@@ -1,9 +1,9 @@
-package com.example.fd.camerax.recorder.util
+package com.example.fd.video.recorder.util
 
 import android.util.Log
 
 object Logging {
-    const val TAG = "MultiMicCameraRec"
+    const val TAG = "MultiMicVideoRecorder"
     fun d(s: String) {
         Log.d(TAG, s)
     }

@@ -1,4 +1,4 @@
-package com.example.fd.camerax.recorder.camerax
+package com.example.fd.video.recorder.camerax
 
 import ai.fd.thinklet.camerax.ThinkletMic
 import android.Manifest
@@ -22,8 +22,8 @@ import androidx.camera.video.VideoRecordEvent
 import androidx.camera.view.PreviewView
 import androidx.core.util.Consumer
 import androidx.lifecycle.LifecycleOwner
-import com.example.fd.camerax.recorder.BuildConfig
-import com.example.fd.camerax.recorder.util.Logging
+import com.example.fd.video.recorder.BuildConfig
+import com.example.fd.video.recorder.util.Logging
 import kotlinx.coroutines.guava.await
 import java.io.File
 import java.util.concurrent.ExecutorService

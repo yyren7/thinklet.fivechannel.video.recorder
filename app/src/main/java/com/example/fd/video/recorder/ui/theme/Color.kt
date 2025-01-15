@@ -1,4 +1,4 @@
-package com.example.fd.camerax.recorder.ui.theme
+package com.example.fd.video.recorder.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

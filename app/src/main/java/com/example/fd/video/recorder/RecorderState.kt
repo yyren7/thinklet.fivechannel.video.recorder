@@ -1,4 +1,4 @@
-package com.example.fd.camerax.recorder
+package com.example.fd.video.recorder
 
 import ai.fd.thinklet.camerax.ThinkletMic
 import ai.fd.thinklet.camerax.mic.ThinkletMics
@@ -26,7 +26,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import com.example.fd.camerax.recorder.camerax.ThinkletRecorder
+import com.example.fd.video.recorder.camerax.ThinkletRecorder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch

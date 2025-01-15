@@ -1,4 +1,4 @@
-package com.example.fd.camerax.recorder.camerax
+package com.example.fd.video.recorder.camerax
 
 import android.os.Build
 import androidx.camera.camera2.Camera2Config
