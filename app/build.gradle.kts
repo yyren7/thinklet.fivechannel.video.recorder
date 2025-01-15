@@ -23,7 +23,7 @@ android {
         // 録画に使うマイクのタイプ
         val micType = "xfe" // or "5ch" or "xfe" or "normal"
         // プレビューの有効化有無
-        val enablePreview = false
+        val enablePreview = true
         // Visionの有効化有無
         val enableVision = true
         // Visionのサーバーポート
