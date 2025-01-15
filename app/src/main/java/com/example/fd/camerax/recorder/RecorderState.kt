@@ -147,8 +147,6 @@ class RecorderState(
 
     @RequiresPermission(allOf = [Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA])
     private suspend fun ThinkletRecorder.requestStart() {
-        if (!isKeepRecording.get()) return
-
         val file = File(
             context.getExternalFilesDir(null),
             "${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.JAPAN).format(Date())}.mp4"
