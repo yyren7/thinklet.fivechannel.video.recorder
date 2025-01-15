@@ -5,6 +5,7 @@ import ai.fd.thinklet.camerax.mic.ThinkletMics
 import ai.fd.thinklet.camerax.mic.multichannel.FiveCh
 import ai.fd.thinklet.camerax.mic.xfe.Xfe
 import ai.fd.thinklet.camerax.vision.Vision
+import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.hardware.camera2.CameraCharacteristics
@@ -13,6 +14,7 @@ import android.media.AudioManager
 import android.media.MediaActionSound
 import android.widget.Toast
 import androidx.annotation.GuardedBy
+import androidx.annotation.RequiresPermission
 import androidx.annotation.WorkerThread
 import androidx.camera.core.Preview
 import androidx.camera.video.VideoRecordEvent
@@ -35,10 +37,12 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * [ThinkletRecorder]と連携し、UI用のデータの提供やUIからのイベントを処理するクラス
  */
+@SuppressLint("MissingPermission")
 @Stable
 class RecorderState(
     private val context: Context,
@@ -51,6 +55,9 @@ class RecorderState(
     private val _isRecording: MutableState<Boolean> = mutableStateOf(false)
     val isRecording: Boolean
         get() = _isRecording.value
+
+    // true: 継続して録画を実行
+    private val isKeepRecording = AtomicBoolean(false)
 
     @GuardedBy("mediaActionSoundMutex")
     private var mediaActionSound: MediaActionSound? = null
@@ -83,6 +90,7 @@ class RecorderState(
                     awaitCancellation()
                 } finally {
                     recorderMutex.withLock {
+                        isKeepRecording.set(false)
                         recorder?.requestStop()
                     }
                 }
@@ -124,19 +132,31 @@ class RecorderState(
         }
     }
 
-    @SuppressLint("MissingPermission")
     private suspend fun toggleRecordStateInternal() = recorderMutex.withLock {
         val localRecorder = recorder ?: return@withLock
+
+        val keep = isKeepRecording.get()
+        isKeepRecording.set(!keep)
+
         if (_isRecording.value) {
             localRecorder.requestStop()
         } else {
-            val file = File(
-                context.getExternalFilesDir(null),
-                "${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.JAPAN).format(Date())}.mp4"
-            )
-            Toast.makeText(context, "StartRecord: ${file.absoluteFile}", Toast.LENGTH_LONG).show()
-            localRecorder.startRecording(file)
+            localRecorder.requestStart()
         }
+    }
+
+    @RequiresPermission(allOf = [Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA])
+    private suspend fun ThinkletRecorder.requestStart() {
+        if (!isKeepRecording.get()) return
+
+        val file = File(
+            context.getExternalFilesDir(null),
+            "${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.JAPAN).format(Date())}.mp4"
+        )
+        withContext(Dispatchers.Main) {
+            Toast.makeText(context, "StartRecord: ${file.absoluteFile}", Toast.LENGTH_LONG).show()
+        }
+        this.startRecording(file)
     }
 
     @WorkerThread
@@ -145,11 +165,37 @@ class RecorderState(
             is VideoRecordEvent.Start -> {
                 playMediaActionSound(MediaActionSound.START_VIDEO_RECORDING)
                 _isRecording.value = true
+
+                // 初回のみ再生する場合の実装例
+                // if (!_isRecording.value) {
+                //     playMediaActionSound(MediaActionSound.START_VIDEO_RECORDING)
+                // }
             }
 
             is VideoRecordEvent.Finalize -> {
                 playMediaActionSound(MediaActionSound.STOP_VIDEO_RECORDING)
                 _isRecording.value = false
+                if (isKeepRecording.get()) {
+                    // 次の動画を撮影
+                    lifecycleOwner.lifecycleScope.launch {
+                        recorderMutex.withLock {
+                            recorder?.requestStart()
+                        }
+                    }
+                }
+
+                // 効果音を頻度を下げる実装例
+                // if (isKeepRecording.get()) {
+                //     // 次の動画を撮影
+                //     lifecycleOwner.lifecycleScope.launch {
+                //         recorderMutex.withLock {
+                //             recorder?.requestStart()
+                //         }
+                //     }
+                // } else {
+                //     playMediaActionSound(MediaActionSound.STOP_VIDEO_RECORDING)
+                //     _isRecording.value = false
+                // }
             }
         }
     }
