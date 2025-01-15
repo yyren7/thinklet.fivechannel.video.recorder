@@ -1,0 +1,11 @@
+[versions]
+thinkletSdk = "0.1.6"
+thinkletCameraX = "1.4.0"
+thinkletCameraXMic = "0.0.1"
+
+[libraries]
+sdk-audio = { group = "ai.fd.thinklet", name = "sdk-audio", version.ref = "thinkletSdk" }
+camerax-video = { group = "ai.fd.thinklet", name = "camerax-camera-video", version.ref = "thinkletCameraX" }
+camerax-mic-core = { group = "ai.fd.thinklet", name = "camerax-mic-core", version.ref = "thinkletCameraXMic" }
+camerax-mic-multi-channel = { group = "ai.fd.thinklet", name = "camerax-mic-multi-channel", version.ref = "thinkletCameraXMic" }
+camerax-mic-xfe = { group = "ai.fd.thinklet", name = "camerax-mic-xfe", version.ref = "thinkletCameraXMic" }
