@@ -1,6 +1,8 @@
 package com.example.fd.camerax.recorder
 
+import ai.fd.thinklet.camerax.ThinkletMic
 import ai.fd.thinklet.camerax.mic.ThinkletMics
+import ai.fd.thinklet.camerax.mic.multichannel.FiveCh
 import ai.fd.thinklet.camerax.mic.xfe.Xfe
 import ai.fd.thinklet.camerax.vision.Vision
 import android.annotation.SuppressLint
@@ -41,7 +43,8 @@ import java.util.Locale
 class RecorderState(
     private val context: Context,
     private val lifecycleOwner: LifecycleOwner,
-    enableVision: Boolean = true
+    enableVision: Boolean = BuildConfig.ENABLE_VISION,
+    visionPort: Int = BuildConfig.VISION_PORT
 ) {
     val isLandscapeCamera: Boolean = isLandscape(context)
 
@@ -87,7 +90,7 @@ class RecorderState(
         }
         lifecycleOwner.lifecycleScope.launch {
             lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                vision?.start(8080)
+                vision?.start(port = visionPort)
                 try {
                     awaitCancellation()
                 } finally {
@@ -97,7 +100,7 @@ class RecorderState(
         }
     }
 
-    fun registerSurfaceProvider(surfaceProvider: Preview.SurfaceProvider) {
+    fun registerSurfaceProvider(surfaceProvider: Preview.SurfaceProvider?) {
         lifecycleOwner.lifecycleScope.launch {
             recorderMutex.withLock {
                 if (recorder != null) {
@@ -106,7 +109,7 @@ class RecorderState(
                 recorder = ThinkletRecorder.create(
                     context = context,
                     lifecycleOwner = lifecycleOwner,
-                    mic = ThinkletMics.Xfe(checkNotNull(context.getSystemService<AudioManager>())),
+                    mic = micType(),
                     analyzer = vision,
                     previewSurfaceProvider = surfaceProvider,
                     recordEventListener = ::handleRecordEvent
@@ -163,6 +166,14 @@ class RecorderState(
             mediaActionSoundMutex.withLock {
                 mediaActionSound?.play(sound)
             }
+        }
+    }
+
+    private fun micType(mic: String = BuildConfig.MIC_TYPE): ThinkletMic? {
+        return when (mic) {
+            "5ch" -> ThinkletMics.FiveCh
+            "xfe" -> ThinkletMics.Xfe(checkNotNull(context.getSystemService<AudioManager>()))
+            else -> null
         }
     }
 

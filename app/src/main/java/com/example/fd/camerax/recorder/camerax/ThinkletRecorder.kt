@@ -22,6 +22,7 @@ import androidx.camera.video.VideoRecordEvent
 import androidx.camera.view.PreviewView
 import androidx.core.util.Consumer
 import androidx.lifecycle.LifecycleOwner
+import com.example.fd.camerax.recorder.BuildConfig
 import com.example.fd.camerax.recorder.util.Logging
 import kotlinx.coroutines.guava.await
 import java.io.File
@@ -40,7 +41,8 @@ internal class ThinkletRecorder private constructor(
     private val context: Context,
     private val recorder: Recorder,
     private val recordEventListener: (VideoRecordEvent) -> Unit,
-    private val recorderListenerExecutor: ExecutorService = Executors.newSingleThreadExecutor()
+    private val recorderListenerExecutor: ExecutorService = Executors.newSingleThreadExecutor(),
+    private val fileSize: Long = BuildConfig.FILE_SIZE
 ) {
     private val recordingLock: Lock = ReentrantLock()
 
@@ -59,7 +61,7 @@ internal class ThinkletRecorder private constructor(
                 context,
                 FileOutputOptions
                     .Builder(outputFile)
-                    .setFileSizeLimit(FILE_SIZE)
+                    .setFileSizeLimit(minOf(fileSize, MAX_FILE_SIZE))
                     .build()
             )
             .withAudioEnabled()
@@ -93,7 +95,7 @@ internal class ThinkletRecorder private constructor(
 
     companion object {
 
-        const val FILE_SIZE = 4L * 1000 * 1000 * 1000
+        const val MAX_FILE_SIZE = 4L * 1000 * 1000 * 1000
 
         /**
          * [ThinkletRecorder]のインスタンスを作成します
