@@ -56,7 +56,7 @@ class RecorderState(
     val isRecording: Boolean
         get() = _isRecording.value
 
-    // true: 継続して録画を実行
+    // true == 次の動画を撮影する
     private val isKeepRecording = AtomicBoolean(false)
 
     @GuardedBy("mediaActionSoundMutex")
@@ -163,11 +163,6 @@ class RecorderState(
             is VideoRecordEvent.Start -> {
                 playMediaActionSound(MediaActionSound.START_VIDEO_RECORDING)
                 _isRecording.value = true
-
-                // 初回のみ再生する場合の実装例
-                // if (!_isRecording.value) {
-                //     playMediaActionSound(MediaActionSound.START_VIDEO_RECORDING)
-                // }
             }
 
             is VideoRecordEvent.Finalize -> {
@@ -181,19 +176,6 @@ class RecorderState(
                         }
                     }
                 }
-
-                // 効果音を頻度を下げる実装例
-                // if (isKeepRecording.get()) {
-                //     // 次の動画を撮影
-                //     lifecycleOwner.lifecycleScope.launch {
-                //         recorderMutex.withLock {
-                //             recorder?.requestStart()
-                //         }
-                //     }
-                // } else {
-                //     playMediaActionSound(MediaActionSound.STOP_VIDEO_RECORDING)
-                //     _isRecording.value = false
-                // }
             }
         }
     }
