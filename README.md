@@ -1,12 +1,12 @@
-# MultiMicVideoRecorder
+# マルチマイク録画 + THINKLET Vision アプリ
 THINKLET向けの CameraX 録画アプリです．  
 アプリを起動し，録画をすると，自動的にmp4ファイルを分割しつつ，長時間録画し続けることができます．  
-また，同一ネットワーク配下にある場合，録画中の画角を他のデバイスのブラウザから確認できます．
+また，同一ネットワーク配下にある場合，カメラの画角を他のデバイスのブラウザからプレビューできます．
 
 ## 導入
 ### はじめに
-このアプリでは，録画ファイルの取り出しに，Adbコマンド，開発者画面の操作を使用しますので．  
-まず，THINKLET開発者ポータルの[開発者画面を表示](https://fairydevicesrd.github.io/thinklet.app.developer/docs/startGuide/useCamera/), [adb設定](https://fairydevicesrd.github.io/thinklet.app.developer/docs/startGuide/helloworld#adb%E8%A8%AD%E5%AE%9A) を確認ください．
+このアプリでは，録画ファイルの取り出しに，Adbコマンド，開発者画面の操作を使用しますので，  
+THINKLET開発者ポータルの[開発者画面を表示](https://fairydevicesrd.github.io/thinklet.app.developer/docs/startGuide/useCamera/), [adb設定](https://fairydevicesrd.github.io/thinklet.app.developer/docs/startGuide/helloworld#adb%E8%A8%AD%E5%AE%9A) を確認ください．
 
 ### ビルド
 1. このレポジトリをcloneします．
@@ -58,7 +58,7 @@ val visionPort = 8080
 
 ### 基本的な使い方
 1. 録画の開始と停止は，THINKLETの第2ボタン(CAMERAキー) で切り替えます．
-2. 録画ファイルの取り出しは，`adb pull /sdcard/Android/data/com.example.fd.video.recorder/files/ /path/to/savedir` で行うことができます．
+2. 録画ファイルの取り出しは，`adb pull /sdcard/Android/data/com.example.fd.video.recorder/files/ /path/to/your_local_savedir` で行うことができます．
 ### オプション
 #### Vision
 1. アプリを実行するTHINKLETと，PCなどブラウザで閲覧するデバイスを同一のWi-Fiに接続してください．
