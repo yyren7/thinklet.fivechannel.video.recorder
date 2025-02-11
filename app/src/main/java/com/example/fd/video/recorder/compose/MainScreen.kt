@@ -1,4 +1,4 @@
-package com.example.fd.camerax.recorder.compose
+package com.example.fd.video.recorder.compose
 
 import android.Manifest
 import androidx.compose.foundation.background
@@ -15,7 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.example.fd.camerax.recorder.RecorderState
+import com.example.fd.video.recorder.RecorderState
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 

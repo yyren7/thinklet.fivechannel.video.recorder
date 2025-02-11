@@ -39,3 +39,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "MultiMicCameraXRecorder"
 include(":app")
+include(":vision")

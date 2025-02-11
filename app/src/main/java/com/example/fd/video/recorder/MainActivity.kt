@@ -1,4 +1,4 @@
-package com.example.fd.camerax.recorder
+package com.example.fd.video.recorder
 
 import android.os.Bundle
 import android.view.KeyEvent
@@ -8,13 +8,13 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
-import com.example.fd.camerax.recorder.compose.MainScreen
-import com.example.fd.camerax.recorder.ui.theme.MultiMicCameraXRecorderTheme
+import com.example.fd.video.recorder.compose.MainScreen
+import com.example.fd.video.recorder.ui.theme.MultiMicVideoRecorderTheme
 
 /**
  * このアプリは，THINKLET向けのCameraXを用いた録画サンプルアプリです．
  * 第２ボタン（Cameraキー）の押下により，録画と録画の停止を行います．
- * 書き出し先ファイルは， `/sdcard/Android/data/com.example.fd.camerax.recorder/files/` 以下にmp4形式で保存されます．
+ * 書き出し先ファイルは， `/sdcard/Android/data/com.example.fd.video.recorder/files/` 以下にmp4形式で保存されます．
  */
 class MainActivity : ComponentActivity() {
     private val recorderState: RecorderState by lazy(LazyThreadSafetyMode.NONE) {
@@ -26,7 +26,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         window.addFlags(FLAG_KEEP_SCREEN_ON)
         setContent {
-            MultiMicCameraXRecorderTheme {
+            MultiMicVideoRecorderTheme {
                 MainScreen(
                     modifier = Modifier.fillMaxSize(),
                     recorderState = recorderState,

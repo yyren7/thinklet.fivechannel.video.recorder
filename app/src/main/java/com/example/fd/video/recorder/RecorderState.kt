@@ -1,7 +1,11 @@
-package com.example.fd.camerax.recorder
+package com.example.fd.video.recorder
 
+import ai.fd.thinklet.camerax.ThinkletMic
 import ai.fd.thinklet.camerax.mic.ThinkletMics
+import ai.fd.thinklet.camerax.mic.multichannel.FiveCh
 import ai.fd.thinklet.camerax.mic.xfe.Xfe
+import ai.fd.thinklet.camerax.vision.Vision
+import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.hardware.camera2.CameraCharacteristics
@@ -10,6 +14,7 @@ import android.media.AudioManager
 import android.media.MediaActionSound
 import android.widget.Toast
 import androidx.annotation.GuardedBy
+import androidx.annotation.RequiresPermission
 import androidx.annotation.WorkerThread
 import androidx.camera.core.Preview
 import androidx.camera.video.VideoRecordEvent
@@ -21,7 +26,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import com.example.fd.camerax.recorder.camerax.ThinkletRecorder
+import com.example.fd.video.recorder.camerax.ThinkletRecorder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
@@ -32,20 +37,27 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * [ThinkletRecorder]と連携し、UI用のデータの提供やUIからのイベントを処理するクラス
  */
+@SuppressLint("MissingPermission")
 @Stable
 class RecorderState(
     private val context: Context,
-    private val lifecycleOwner: LifecycleOwner
+    private val lifecycleOwner: LifecycleOwner,
+    enableVision: Boolean = BuildConfig.ENABLE_VISION,
+    visionPort: Int = BuildConfig.VISION_PORT
 ) {
     val isLandscapeCamera: Boolean = isLandscape(context)
 
     private val _isRecording: MutableState<Boolean> = mutableStateOf(false)
     val isRecording: Boolean
         get() = _isRecording.value
+
+    // true == 次の動画を撮影する
+    private val isKeepRecording = AtomicBoolean(false)
 
     @GuardedBy("mediaActionSoundMutex")
     private var mediaActionSound: MediaActionSound? = null
@@ -54,6 +66,8 @@ class RecorderState(
     @GuardedBy("recorderMutex")
     private var recorder: ThinkletRecorder? = null
     private val recorderMutex: Mutex = Mutex()
+
+    private val vision: Vision? = if (enableVision) Vision() else null
 
     init {
         lifecycleOwner.lifecycleScope.launch {
@@ -76,14 +90,25 @@ class RecorderState(
                     awaitCancellation()
                 } finally {
                     recorderMutex.withLock {
+                        isKeepRecording.set(false)
                         recorder?.requestStop()
                     }
                 }
             }
         }
+        lifecycleOwner.lifecycleScope.launch {
+            lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                vision?.start(port = visionPort)
+                try {
+                    awaitCancellation()
+                } finally {
+                    vision?.stop()
+                }
+            }
+        }
     }
 
-    fun registerSurfaceProvider(surfaceProvider: Preview.SurfaceProvider) {
+    fun registerSurfaceProvider(surfaceProvider: Preview.SurfaceProvider?) {
         lifecycleOwner.lifecycleScope.launch {
             recorderMutex.withLock {
                 if (recorder != null) {
@@ -92,7 +117,8 @@ class RecorderState(
                 recorder = ThinkletRecorder.create(
                     context = context,
                     lifecycleOwner = lifecycleOwner,
-                    mic = ThinkletMics.Xfe(checkNotNull(context.getSystemService<AudioManager>())),
+                    mic = micType(),
+                    analyzer = vision,
                     previewSurfaceProvider = surfaceProvider,
                     recordEventListener = ::handleRecordEvent
                 )
@@ -106,19 +132,29 @@ class RecorderState(
         }
     }
 
-    @SuppressLint("MissingPermission")
     private suspend fun toggleRecordStateInternal() = recorderMutex.withLock {
         val localRecorder = recorder ?: return@withLock
+
+        val keep = isKeepRecording.get()
+        isKeepRecording.set(!keep)
+
         if (_isRecording.value) {
             localRecorder.requestStop()
         } else {
-            val file = File(
-                context.getExternalFilesDir(null),
-                "${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.JAPAN).format(Date())}.mp4"
-            )
-            Toast.makeText(context, "StartRecord: ${file.absoluteFile}", Toast.LENGTH_LONG).show()
-            localRecorder.startRecording(file)
+            localRecorder.requestStart()
         }
+    }
+
+    @RequiresPermission(allOf = [Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA])
+    private suspend fun ThinkletRecorder.requestStart() {
+        val file = File(
+            context.getExternalFilesDir(null),
+            "${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.JAPAN).format(Date())}.mp4"
+        )
+        withContext(Dispatchers.Main) {
+            Toast.makeText(context, "StartRecord: ${file.absoluteFile}", Toast.LENGTH_LONG).show()
+        }
+        this.startRecording(file)
     }
 
     @WorkerThread
@@ -132,6 +168,14 @@ class RecorderState(
             is VideoRecordEvent.Finalize -> {
                 playMediaActionSound(MediaActionSound.STOP_VIDEO_RECORDING)
                 _isRecording.value = false
+                if (isKeepRecording.get()) {
+                    // 次の動画を撮影
+                    lifecycleOwner.lifecycleScope.launch {
+                        recorderMutex.withLock {
+                            recorder?.requestStart()
+                        }
+                    }
+                }
             }
         }
     }
@@ -148,6 +192,14 @@ class RecorderState(
             mediaActionSoundMutex.withLock {
                 mediaActionSound?.play(sound)
             }
+        }
+    }
+
+    private fun micType(mic: String = BuildConfig.MIC_TYPE): ThinkletMic? {
+        return when (mic) {
+            "5ch" -> ThinkletMics.FiveCh
+            "xfe" -> ThinkletMics.Xfe(checkNotNull(context.getSystemService<AudioManager>()))
+            else -> null
         }
     }
 

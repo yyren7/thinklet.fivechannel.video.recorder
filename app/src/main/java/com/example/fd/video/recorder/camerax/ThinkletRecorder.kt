@@ -1,4 +1,4 @@
-package com.example.fd.camerax.recorder.camerax
+package com.example.fd.video.recorder.camerax
 
 import ai.fd.thinklet.camerax.ThinkletMic
 import android.Manifest
@@ -7,6 +7,7 @@ import androidx.annotation.GuardedBy
 import androidx.annotation.MainThread
 import androidx.annotation.RequiresPermission
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.core.UseCase
 import androidx.camera.core.UseCaseGroup
@@ -21,7 +22,8 @@ import androidx.camera.video.VideoRecordEvent
 import androidx.camera.view.PreviewView
 import androidx.core.util.Consumer
 import androidx.lifecycle.LifecycleOwner
-import com.example.fd.camerax.recorder.util.Logging
+import com.example.fd.video.recorder.BuildConfig
+import com.example.fd.video.recorder.util.Logging
 import kotlinx.coroutines.guava.await
 import java.io.File
 import java.util.concurrent.ExecutorService
@@ -39,7 +41,8 @@ internal class ThinkletRecorder private constructor(
     private val context: Context,
     private val recorder: Recorder,
     private val recordEventListener: (VideoRecordEvent) -> Unit,
-    private val recorderListenerExecutor: ExecutorService = Executors.newSingleThreadExecutor()
+    private val recorderListenerExecutor: ExecutorService = Executors.newSingleThreadExecutor(),
+    private val fileSize: Long = BuildConfig.FILE_SIZE
 ) {
     private val recordingLock: Lock = ReentrantLock()
 
@@ -58,7 +61,7 @@ internal class ThinkletRecorder private constructor(
                 context,
                 FileOutputOptions
                     .Builder(outputFile)
-                    .setFileSizeLimit(FILE_SIZE)
+                    .setFileSizeLimit(minOf(fileSize, MAX_FILE_SIZE))
                     .build()
             )
             .withAudioEnabled()
@@ -92,7 +95,7 @@ internal class ThinkletRecorder private constructor(
 
     companion object {
 
-        const val FILE_SIZE = 4L * 1000 * 1000 * 1000
+        const val MAX_FILE_SIZE = 4L * 1000 * 1000 * 1000
 
         /**
          * [ThinkletRecorder]のインスタンスを作成します
@@ -101,6 +104,7 @@ internal class ThinkletRecorder private constructor(
          *
          * @param lifecycleOwner カメラのライフサイクルと紐付ける[LifecycleOwner]
          * @param mic 使用するTHINKLET独自のマイク機能
+         * @param analyzer カメラAnalyzer
          * @param previewSurfaceProvider プレビューを表示する[PreviewView]から取得した[Preview.SurfaceProvider]
          * @param recordEventListener CameraX側からの[VideoRecordEvent]イベントを受け取るリスナー
          * @param recorderExecutor [recordEventListener]の実行スレッドを指定する[ExecutorService]
@@ -110,6 +114,7 @@ internal class ThinkletRecorder private constructor(
             context: Context,
             lifecycleOwner: LifecycleOwner,
             mic: ThinkletMic?,
+            analyzer: ImageAnalysis.Analyzer?,
             previewSurfaceProvider: Preview.SurfaceProvider? = null,
             recordEventListener: (VideoRecordEvent) -> Unit = {},
             recorderExecutor: ExecutorService = Executors.newSingleThreadExecutor()
@@ -123,6 +128,12 @@ internal class ThinkletRecorder private constructor(
                 .build()
             val videoCaptureUseCase = VideoCapture.Builder(recorder).build()
 
+            // Vision機能用のAnalyzer
+            val analyzerUseCase = if (analyzer != null) {
+                AnalyzerConfigure(analyzer).build()
+            } else {
+                null
+            }
             val previewUseCase = if (previewSurfaceProvider != null) {
                 Preview.Builder().build().apply {
                     surfaceProvider = previewSurfaceProvider
@@ -133,6 +144,7 @@ internal class ThinkletRecorder private constructor(
 
             val useCaseGroup = UseCaseGroup.Builder()
                 .addUseCase(videoCaptureUseCase)
+                .addUseCaseIfPresent(analyzerUseCase)
                 .addUseCaseIfPresent(previewUseCase)
                 .build()
 

@@ -5,17 +5,35 @@ plugins {
 }
 
 android {
-    namespace = "com.example.fd.camerax.recorder"
+    namespace = "com.example.fd.video.recorder"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.fd.camerax.recorder"
+        applicationId = "com.example.fd.video.recorder"
         minSdk = 27
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // デフォルトの設定値
+        // 動画の最大ファイルサイズ
+        val fileSize = 1*1000*1000*1000 // 1GB
+        // 録画に使うマイクのタイプ
+        val micType = "xfe" // or "5ch" or "xfe" or "normal"
+        // プレビューの有効化有無
+        val enablePreview = true
+        // Visionの有効化有無
+        val enableVision = true
+        // Visionのサーバーポート
+        val visionPort = 8080
+
+        buildConfigField("long", "FILE_SIZE", "$fileSize")
+        buildConfigField("String", "MIC_TYPE", "\"$micType\"")
+        buildConfigField("boolean", "ENABLE_PREVIEW", "$enablePreview")
+        buildConfigField("boolean", "ENABLE_VISION", "$enableVision")
+        buildConfigField("int", "VISION_PORT", "$visionPort")
     }
 
     buildTypes {
@@ -36,10 +54,11 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     packaging {
         resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "/META-INF/{AL2.0,LGPL2.1,INDEX.LIST,io.netty.versions.properties}"
         }
     }
 }
@@ -71,6 +90,9 @@ dependencies {
     implementation(thinkletLibs.camerax.mic.xfe)
     // THINKLET向けのSDKを追加
     implementation(thinkletLibs.sdk.audio)
+
+    // https://github.com/FairyDevicesRD/thinklet.camerax.vision
+    implementation(project(":vision"))
 
     testImplementation(libs.junit)
 
