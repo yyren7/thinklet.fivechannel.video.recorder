@@ -3,6 +3,9 @@ THINKLET向けの CameraX 録画アプリです．
 アプリを起動し，録画をすると，自動的にmp4ファイルを分割しつつ，長時間録画し続けることができます．  
 また，同一ネットワーク配下にある場合，カメラの画角を他のデバイスのブラウザからプレビューできます．
 
+## 開発時
+- Android Studio Ladybug Feature Drop | 2024.2.2
+
 ## 導入
 ### はじめに
 このアプリでは，録画ファイルの取り出しに，Adbコマンド，開発者画面の操作を使用しますので，  
@@ -61,6 +64,9 @@ val visionPort = 8080
 2. 録画ファイルの取り出しは，`adb pull /sdcard/Android/data/com.example.fd.video.recorder/files/ /path/to/your_local_savedir` で行うことができます．
 ### オプション
 #### Vision
+> [!NOTE]
+> `http` を使っておりますので，お使いのブラウザや，OSの設定等により，ご利用いただけないことがあります．
+
 1. アプリを実行するTHINKLETと，PCなどブラウザで閲覧するデバイスを同一のWi-Fiに接続してください．
 2. THINKLETに割り振られた Wi-Fiを確認します．下記の場合，`192.168.0.123` となります．
 ```shell
@@ -72,4 +78,3 @@ $ adb shell ip addr show wlan0
 ```
 3. THINKLETで，本アプリを起動します．
 4. 別デバイスのブラウザから，`http://192.168.0.84:8080` へアクセスします．`visionPort` を変えている場合は適宜読み替えてください．
-
