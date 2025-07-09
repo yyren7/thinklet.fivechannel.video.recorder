@@ -21,7 +21,7 @@ android {
         // 動画の最大ファイルサイズ
         val fileSize = 1*1000*1000*1000 // 1GB
         // 録画に使うマイクのタイプ
-        val micType = "xfe" // or "5ch" or "xfe" or "normal"
+        val micType = "raw" // or "5ch" or "xfe" or "raw" or "normal"
         // プレビューの有効化有無
         val enablePreview = true
         // Visionの有効化有無

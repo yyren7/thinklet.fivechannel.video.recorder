@@ -1,10 +1,17 @@
-# マルチマイク録画 + THINKLET Vision アプリ
-THINKLET向けの CameraX 録画アプリです．  
-アプリを起動し，録画をすると，自動的にmp4ファイルを分割しつつ，長時間録画し続けることができます．  
-また，同一ネットワーク配下にある場合，カメラの画角を他のデバイスのブラウザからプレビューできます．
+# マルチマイク録画 + THINKLET Vision アプリ + 5ch音声ファイル出力
+THINKLET向けの CameraX 録画アプリ(5ch音声ファイル出力対応版)です．  
+【新機能】5チャンネル音声をそのまま保存できることができます．  
+
+> [!NOTE]
+>
+> - [従来版](https://github.com/FairyDevicesRD/thinklet.video.recorder)：音声は，5chマイクから録った音声を処理して，動画ファイルの音声チャネルに1chまたは2chで保存されます．
+> - 本リポジトリ版：従来版の動画への音声保存に加えて，5chの音声データを **別々に** Rawファイル（無圧縮の音声ファイル）にも保存します．
+>   - 設定値を`raw`に指定することで，mp4ファイルと共に5ch音声をRAWファイルとして出力します．
+
+このアプリを開発するに至った背景は，[こちらの記事](https://zenn.dev/fairydevices/articles/fa193d1a4d6596)を参照してください．
 
 ## 開発時
-- Android Studio Ladybug Feature Drop | 2024.2.2
+- Android Studio Narwhal Feature Drop | 2025.1.2
 
 ## 導入
 ### はじめに
@@ -40,8 +47,9 @@ val fileSize = 1*1000*1000*1000 // = 1GB
 // https://github.com/FairyDevicesRD/thinklet.camerax.mic で提供するマイクを切り替えます
 //   5ch: シンプルな5chマイクを1chに変換したもの
 //   xfe: AppSDKの試験的な音声処理を行った5chマイクを1chに変換したもの
+//   raw: 5ch音声をRAWファイルで出力するもの
 //   normal: シンプルな1chマイクを使用したもの
-val micType = "xfe" // or "5ch" or "xfe" or "normal"
+val micType = "raw" // or "5ch" or "xfe" or "raw" or "normal"
 
 // プレビューの有効化有無
 val enablePreview = true

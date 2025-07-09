@@ -1,5 +1,7 @@
 package com.example.fd.video.recorder
 
+import ai.fd.thinklet.camerax.ThinkletAudioRecordWrapperFactory
+import ai.fd.thinklet.camerax.ThinkletAudioSettingsPatcher
 import ai.fd.thinklet.camerax.ThinkletMic
 import ai.fd.thinklet.camerax.mic.ThinkletMics
 import ai.fd.thinklet.camerax.mic.multichannel.FiveCh
@@ -26,7 +28,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.example.fd.video.recorder.camerax.RawAudioRecCaptureRepository
 import com.example.fd.video.recorder.camerax.ThinkletRecorder
+import com.example.fd.video.recorder.camerax.impl.ThinkletAudioRecordWrapperRepositoryImpl
+import com.example.fd.video.recorder.util.Logging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
@@ -68,6 +73,12 @@ class RecorderState(
     private val recorderMutex: Mutex = Mutex()
 
     private val vision: Vision? = if (enableVision) Vision() else null
+
+    private val thinkletAudioRecordWrapperRepository = ThinkletAudioRecordWrapperRepositoryImpl()
+    private val rawAudioRecCaptureRepository = RawAudioRecCaptureRepository(
+        coroutineScope = lifecycleOwner.lifecycleScope,
+        audioRecordWrapperRepository = thinkletAudioRecordWrapperRepository,
+    )
 
     init {
         lifecycleOwner.lifecycleScope.launch {
@@ -120,7 +131,8 @@ class RecorderState(
                     mic = micType(),
                     analyzer = vision,
                     previewSurfaceProvider = surfaceProvider,
-                    recordEventListener = ::handleRecordEvent
+                    rawAudioRecCaptureRepository = rawAudioRecCaptureRepository,
+                    recordEventListener = ::handleRecordEvent,
                 )
             }
         }
@@ -147,14 +159,19 @@ class RecorderState(
 
     @RequiresPermission(allOf = [Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA])
     private suspend fun ThinkletRecorder.requestStart() {
+        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.JAPAN).format(Date())
         val file = File(
             context.getExternalFilesDir(null),
-            "${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.JAPAN).format(Date())}.mp4"
+            "${timeStamp}.mp4"
         )
         withContext(Dispatchers.Main) {
             Toast.makeText(context, "StartRecord: ${file.absoluteFile}", Toast.LENGTH_LONG).show()
         }
-        this.startRecording(file)
+        val audioFile = File(
+            context.getExternalFilesDir(null),
+            "${timeStamp}.raw"
+        )
+        this.startRecording(file, audioFile)
     }
 
     @WorkerThread
@@ -199,7 +216,20 @@ class RecorderState(
         return when (mic) {
             "5ch" -> ThinkletMics.FiveCh
             "xfe" -> ThinkletMics.Xfe(checkNotNull(context.getSystemService<AudioManager>()))
+            "raw" -> buildThinkletMic(thinkletAudioRecordWrapperRepository)
             else -> null
+        }
+    }
+
+    private fun buildThinkletMic(
+        thinkletAudioRecordWrapperRepository: ThinkletAudioRecordWrapperFactory,
+    ): ThinkletMic {
+        Logging.d("RawAudioEnabled!")
+        return object : ThinkletMic {
+            override fun getAudioSettingsPatcher(): ThinkletAudioSettingsPatcher? = null
+
+            override fun getAudioRecordWrapperFactory(): ThinkletAudioRecordWrapperFactory? =
+                thinkletAudioRecordWrapperRepository
         }
     }
 

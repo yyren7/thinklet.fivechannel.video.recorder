@@ -41,6 +41,7 @@ internal class ThinkletRecorder private constructor(
     private val context: Context,
     private val recorder: Recorder,
     private val recordEventListener: (VideoRecordEvent) -> Unit,
+    private val rawAudioRecCaptureRepository: RawAudioRecCaptureRepository,
     private val recorderListenerExecutor: ExecutorService = Executors.newSingleThreadExecutor(),
     private val fileSize: Long = BuildConfig.FILE_SIZE
 ) {
@@ -50,7 +51,7 @@ internal class ThinkletRecorder private constructor(
     private var recording: Recording? = null
 
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
-    fun startRecording(outputFile: File): Boolean = recordingLock.withLock {
+    fun startRecording(outputFile: File, outputAudioFile: File): Boolean = recordingLock.withLock {
         if (recording != null) {
             Logging.w("already recording")
             return false
@@ -75,6 +76,7 @@ internal class ThinkletRecorder private constructor(
             e.printStackTrace()
             return false
         }
+        rawAudioRecCaptureRepository.startRecording(outputAudioFile)
         return true
     }
 
@@ -90,6 +92,7 @@ internal class ThinkletRecorder private constructor(
     fun requestStop() {
         recordingLock.withLock {
             recording?.close()
+            rawAudioRecCaptureRepository.stopRecording()
         }
     }
 
@@ -107,6 +110,7 @@ internal class ThinkletRecorder private constructor(
          * @param analyzer カメラAnalyzer
          * @param previewSurfaceProvider プレビューを表示する[PreviewView]から取得した[Preview.SurfaceProvider]
          * @param recordEventListener CameraX側からの[VideoRecordEvent]イベントを受け取るリスナー
+         * @param rawAudioRecCaptureRepository 5ch音声の録音を行う[RawAudioRecCaptureRepository]
          * @param recorderExecutor [recordEventListener]の実行スレッドを指定する[ExecutorService]
          */
         @MainThread
@@ -117,6 +121,7 @@ internal class ThinkletRecorder private constructor(
             analyzer: ImageAnalysis.Analyzer?,
             previewSurfaceProvider: Preview.SurfaceProvider? = null,
             recordEventListener: (VideoRecordEvent) -> Unit = {},
+            rawAudioRecCaptureRepository: RawAudioRecCaptureRepository,
             recorderExecutor: ExecutorService = Executors.newSingleThreadExecutor()
         ): ThinkletRecorder? {
             CameraXPatch.apply()
@@ -150,7 +155,12 @@ internal class ThinkletRecorder private constructor(
 
             val cameraProvider = ProcessCameraProvider.getInstance(context).await()
             bind(cameraProvider, lifecycleOwner, useCaseGroup)
-            return ThinkletRecorder(context, recorder, recordEventListener)
+            return ThinkletRecorder(
+                context,
+                recorder,
+                recordEventListener,
+                rawAudioRecCaptureRepository
+            )
         }
 
         @MainThread
