@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import com.example.fd.video.recorder.compose.MainScreen
 import com.example.fd.video.recorder.ui.theme.MultiMicVideoRecorderTheme
+import android.util.Log
 
 /**
  * このアプリは，THINKLET向けのCameraXを用いた録画サンプルアプリです．
@@ -35,14 +36,20 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        recorderState.release()
+    }
+
     override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        Log.d("ThinkletKeyEvent", "Key pressed - KeyCode: $keyCode, Event: ${event?.toString()}")
         return when (keyCode) {
             KeyEvent.KEYCODE_CAMERA -> {
                 recorderState.toggleRecordState()
                 return true
             }
 
-            else -> false
+            else -> super.onKeyUp(keyCode, event)
         }
     }
 }

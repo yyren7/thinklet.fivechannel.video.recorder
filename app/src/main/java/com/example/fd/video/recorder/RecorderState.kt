@@ -14,6 +14,7 @@ import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.media.AudioManager
 import android.media.MediaActionSound
+import android.speech.tts.TextToSpeech
 import android.widget.Toast
 import androidx.annotation.GuardedBy
 import androidx.annotation.RequiresPermission
@@ -54,7 +55,7 @@ class RecorderState(
     private val lifecycleOwner: LifecycleOwner,
     enableVision: Boolean = BuildConfig.ENABLE_VISION,
     visionPort: Int = BuildConfig.VISION_PORT
-) {
+) : TextToSpeech.OnInitListener {
     val isLandscapeCamera: Boolean = isLandscape(context)
 
     private val _isRecording: MutableState<Boolean> = mutableStateOf(false)
@@ -79,6 +80,8 @@ class RecorderState(
         coroutineScope = lifecycleOwner.lifecycleScope,
         audioRecordWrapperRepository = thinkletAudioRecordWrapperRepository,
     )
+
+    private val tts: TextToSpeech = TextToSpeech(context, this)
 
     init {
         lifecycleOwner.lifecycleScope.launch {
@@ -117,6 +120,17 @@ class RecorderState(
                 }
             }
         }
+    }
+
+    override fun onInit(status: Int) {
+        if (status == TextToSpeech.SUCCESS) {
+            tts.language = Locale.CHINESE
+        }
+    }
+
+    fun release() {
+        tts.stop()
+        tts.shutdown()
     }
 
     fun registerSurfaceProvider(surfaceProvider: Preview.SurfaceProvider?) {
@@ -179,11 +193,13 @@ class RecorderState(
         when (event) {
             is VideoRecordEvent.Start -> {
                 playMediaActionSound(MediaActionSound.START_VIDEO_RECORDING)
+                tts.speak("recording started", TextToSpeech.QUEUE_FLUSH, null, "")
                 _isRecording.value = true
             }
 
             is VideoRecordEvent.Finalize -> {
                 playMediaActionSound(MediaActionSound.STOP_VIDEO_RECORDING)
+                tts.speak("recording finished", TextToSpeech.QUEUE_FLUSH, null, "")
                 _isRecording.value = false
                 if (isKeepRecording.get()) {
                     // 次の動画を撮影

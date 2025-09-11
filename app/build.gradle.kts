@@ -9,7 +9,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.fd.video.recorder"
+        applicationId = "com.example.fd.video.multimicrecorder"
         minSdk = 27
         targetSdk = 35
         versionCode = 1
@@ -21,7 +21,7 @@ android {
         // 動画の最大ファイルサイズ
         val fileSize = 1*1000*1000*1000 // 1GB
         // 録画に使うマイクのタイプ
-        val micType = "raw" // or "5ch" or "xfe" or "raw" or "normal"
+        val micType = "xfe" // or "5ch" or "xfe" or "raw" or "normal"
         // プレビューの有効化有無
         val enablePreview = true
         // Visionの有効化有無
