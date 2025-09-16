@@ -62,7 +62,7 @@ class MainActivity : ComponentActivity() {
             }
 
             KeyEvent.KEYCODE_VOLUME_UP -> {
-                recorderState.speakBatteryAndNetworkStatus()
+                recorderState.speakNetworkStatus()
                 return true
             }
 

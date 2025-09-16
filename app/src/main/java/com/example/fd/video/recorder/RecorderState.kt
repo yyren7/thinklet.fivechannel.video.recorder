@@ -293,7 +293,26 @@ class RecorderState(
         val connectionInfo = wifiManager.connectionInfo
         val currentSsid = connectionInfo.ssid?.removePrefix("\"")?.removeSuffix("\"") ?: "unknown network"
         
-        return currentSsid
+        // Make WiFi name more pronounceable by spelling it out
+        return "connected to wifi ${spellOutWifiName(currentSsid)}"
+    }
+
+    /**
+     * Convert WiFi name to spelled-out format for clearer TTS pronunciation
+     */
+    private fun spellOutWifiName(wifiName: String): String {
+        // Spell out all WiFi names character by character for better pronunciation
+        return wifiName.map { char ->
+            when {
+                char.isLetter() -> char.toString()
+                char.isDigit() -> char.toString()
+                char == '-' -> "dash"
+                char == '_' -> "underscore"
+                char == '.' -> "dot"
+                char == ' ' -> "space"
+                else -> char.toString()
+            }
+        }.joinToString(" ")
     }
 
     /**
