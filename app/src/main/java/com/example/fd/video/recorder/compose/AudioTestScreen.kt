@@ -39,60 +39,60 @@ fun AudioTestScreen(
         verticalArrangement = Arrangement.Center
     ) {
         Button(onClick = onNavigateBack) {
-            Text("返回主屏幕")
+            Text("Back to Main Screen")
         }
         Spacer(modifier = Modifier.height(16.dp))
 
-        Text("音量测试")
+        Text("Volume Test")
         Spacer(modifier = Modifier.height(16.dp))
         
-        // 通知音量
+        // Notification Volume
         Row {
             Button(onClick = { audioTestViewModel.increaseVolume(AudioManager.STREAM_NOTIFICATION) }) {
-                Text("增加音量")
+                Text("Increase Volume")
             }
             Spacer(modifier = Modifier.width(8.dp))
             Button(onClick = { audioTestViewModel.decreaseVolume(AudioManager.STREAM_NOTIFICATION) }) {
-                Text("减少音量")
+                Text("Decrease Volume")
             }
         }
         Button(onClick = { audioTestViewModel.playNotification(context) }) {
-            Text("播放通知")
+            Text("Play Notification")
         }
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 铃声音量
+        // Ringtone Volume
         Row {
             Button(onClick = { audioTestViewModel.increaseVolume(AudioManager.STREAM_RING) }) {
-                Text("增加音量")
+                Text("Increase Volume")
             }
             Spacer(modifier = Modifier.width(8.dp))
             Button(onClick = { audioTestViewModel.decreaseVolume(AudioManager.STREAM_RING) }) {
-                Text("减少音量")
+                Text("Decrease Volume")
             }
         }
         Button(onClick = { audioTestViewModel.playRingtone(context) }) {
-            Text("播放铃声")
+            Text("Play Ringtone")
         }
         Spacer(modifier = Modifier.height(8.dp))
         Button(onClick = { audioTestViewModel.stopRingtone() }) {
-            Text("停止播放铃声")
+            Text("Stop Ringtone")
         }
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 媒体音量
+        // Media Volume
         Row {
             Button(onClick = { audioTestViewModel.increaseVolume(AudioManager.STREAM_MUSIC) }) {
-                Text("增加音量")
+                Text("Increase Volume")
             }
             Spacer(modifier = Modifier.width(8.dp))
             Button(onClick = { audioTestViewModel.decreaseVolume(AudioManager.STREAM_MUSIC) }) {
-                Text("减少音量")
+                Text("Decrease Volume")
             }
         }
         Row{
             Button(onClick = { audioTestViewModel.playTtsMessage() }) {
-                Text("播放 'recording finished'")
+                Text("Play 'recording finished'")
             }
         }
     }
