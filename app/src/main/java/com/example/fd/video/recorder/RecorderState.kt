@@ -133,12 +133,18 @@ class RecorderState(
         tts.shutdown()
     }
 
+    fun releaseRecorder() {
+        lifecycleOwner.lifecycleScope.launch {
+            recorderMutex.withLock {
+                recorder?.requestStop()
+                recorder = null
+            }
+        }
+    }
+
     fun registerSurfaceProvider(surfaceProvider: Preview.SurfaceProvider?) {
         lifecycleOwner.lifecycleScope.launch {
             recorderMutex.withLock {
-                if (recorder != null) {
-                    return@launch
-                }
                 recorder = ThinkletRecorder.create(
                     context = context,
                     lifecycleOwner = lifecycleOwner,

@@ -84,6 +84,9 @@ dependencies {
     // 代わりに，THINKLETカスタムのCamera－Videoを追加．
     implementation(thinkletLibs.camerax.video)
 
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+
     // THINKLET向けのマイクを追加
     implementation(thinkletLibs.camerax.mic.core)
     implementation(thinkletLibs.camerax.mic.multi.channel)

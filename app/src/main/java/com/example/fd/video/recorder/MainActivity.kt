@@ -8,9 +8,14 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
+import com.example.fd.video.recorder.compose.AudioTestScreen
 import com.example.fd.video.recorder.compose.MainScreen
 import com.example.fd.video.recorder.ui.theme.MultiMicVideoRecorderTheme
 import android.util.Log
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 
 /**
  * このアプリは，THINKLET向けのCameraXを用いた録画サンプルアプリです．
@@ -27,11 +32,18 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         window.addFlags(FLAG_KEEP_SCREEN_ON)
         setContent {
+            var showAudioTestScreen by remember { mutableStateOf(false) }
+
             MultiMicVideoRecorderTheme {
-                MainScreen(
-                    modifier = Modifier.fillMaxSize(),
-                    recorderState = recorderState,
-                )
+                if (showAudioTestScreen) {
+                    AudioTestScreen(onNavigateBack = { showAudioTestScreen = false })
+                } else {
+                    MainScreen(
+                        modifier = Modifier.fillMaxSize(),
+                        recorderState = recorderState,
+                        onNavigateToAudioTest = { showAudioTestScreen = true }
+                    )
+                }
             }
         }
     }

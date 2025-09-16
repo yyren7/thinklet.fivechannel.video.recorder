@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,6 +37,12 @@ import kotlinx.coroutines.delay
 import java.math.BigInteger
 import java.net.InetAddress
 import java.nio.ByteOrder
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.wifi.WifiInfo
+import androidx.compose.runtime.rememberUpdatedState
+import android.annotation.SuppressLint
 
 /**
  * カメラのPreviewを表示．録画中は右上に緑色の丸図形を描画する Compose．
@@ -44,7 +51,8 @@ import java.nio.ByteOrder
 @Composable
 fun MainScreen(
     recorderState: RecorderState,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onNavigateToAudioTest: () -> Unit
 ) {
     val permissionsState = rememberMultiplePermissionsState(
         permissions = listOf(
@@ -83,6 +91,9 @@ fun MainScreen(
                         )
                     }
                 }
+                Button(onClick = onNavigateToAudioTest) {
+                    Text("Go to Audio Test")
+                }
                 Box(modifier = Modifier.weight(0.3f)) {
                     WifiInfoView()
                 }
@@ -94,6 +105,7 @@ fun MainScreen(
     }
 }
 
+@SuppressLint("MissingPermission")
 @Composable
 fun WifiInfoView() {
     val context = LocalContext.current

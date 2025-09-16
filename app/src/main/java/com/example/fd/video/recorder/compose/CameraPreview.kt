@@ -5,6 +5,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.camera.view.PreviewView
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.fd.video.recorder.BuildConfig
@@ -20,6 +21,12 @@ fun CameraPreview(
     val width = if (recorderState.isLandscapeCamera) previewSize.width else previewSize.height
     val height = if (recorderState.isLandscapeCamera) previewSize.height else previewSize.width
 
+    DisposableEffect(recorderState) {
+        onDispose {
+            recorderState.releaseRecorder()
+        }
+    }
+
     AndroidView(
         modifier = modifier,
         factory = { context ->
@@ -31,9 +38,11 @@ fun CameraPreview(
             } else {
                 View(context)
             }
+            return@AndroidView view
+        },
+        update = { view ->
             val surfaceProvider = if (view is PreviewView) view.surfaceProvider else null
             recorderState.registerSurfaceProvider(surfaceProvider)
-            return@AndroidView view
         }
     )
 }
