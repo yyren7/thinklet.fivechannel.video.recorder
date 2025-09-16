@@ -14,8 +14,12 @@ import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.media.AudioManager
 import android.media.MediaActionSound
+import android.os.BatteryManager
 import android.speech.tts.TextToSpeech
 import android.widget.Toast
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.net.wifi.WifiManager
 import androidx.annotation.GuardedBy
 import androidx.annotation.RequiresPermission
 import androidx.annotation.WorkerThread
@@ -253,6 +257,71 @@ class RecorderState(
             override fun getAudioRecordWrapperFactory(): ThinkletAudioRecordWrapperFactory? =
                 thinkletAudioRecordWrapperRepository
         }
+    }
+
+    /**
+     * Get current battery percentage
+     */
+    private fun getBatteryPercentage(): Int {
+        val batteryManager = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+        return batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+    }
+
+    /**
+     * Get current network status information
+     */
+    @SuppressLint("MissingPermission")
+    private fun getNetworkStatus(): String {
+        val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        
+        // Check if WiFi is enabled
+        if (!wifiManager.isWifiEnabled) {
+            return "wifi is disabled"
+        }
+        
+        // Check if connected to WiFi network
+        val activeNetwork = connectivityManager.activeNetwork
+        val networkCapabilities = connectivityManager.getNetworkCapabilities(activeNetwork)
+        val isWifiConnected = networkCapabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ?: false
+        
+        if (!isWifiConnected) {
+            return "not connected to wifi"
+        }
+        
+        // Get current connected WiFi information
+        val connectionInfo = wifiManager.connectionInfo
+        val currentSsid = connectionInfo.ssid?.removePrefix("\"")?.removeSuffix("\"") ?: "unknown network"
+        
+        return currentSsid
+    }
+
+    /**
+     * Speak battery status via TTS
+     */
+    fun speakBatteryStatus() {
+        val batteryPercentage = getBatteryPercentage()
+        val message = "battery status: ${batteryPercentage} percentage remaining"
+        tts.speak(message, TextToSpeech.QUEUE_FLUSH, null, "battery_status")
+    }
+
+    /**
+     * Speak network status via TTS
+     */
+    fun speakNetworkStatus() {
+        val networkStatus = getNetworkStatus()
+        val message = "network status: $networkStatus"
+        tts.speak(message, TextToSpeech.QUEUE_ADD, null, "network_status")
+    }
+
+    /**
+     * Speak both battery and network status via TTS
+     */
+    fun speakBatteryAndNetworkStatus() {
+        val batteryPercentage = getBatteryPercentage()
+        val networkStatus = getNetworkStatus()
+        val message = "battery status: ${batteryPercentage} percentage remaining, network status: $networkStatus"
+        tts.speak(message, TextToSpeech.QUEUE_FLUSH, null, "battery_network_status")
     }
 
     companion object {

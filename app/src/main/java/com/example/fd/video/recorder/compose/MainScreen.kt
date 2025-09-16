@@ -8,8 +8,10 @@ import android.content.IntentFilter
 import android.net.wifi.WifiManager
 import android.os.BatteryManager
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -96,11 +98,16 @@ fun MainScreen(
                         )
                     }
                 }
-                Button(onClick = { isCameraEnabled = !isCameraEnabled }) {
-                    Text(if (isCameraEnabled) "关闭摄像头" else "开启摄像头")
-                }
-                Button(onClick = onNavigateToAudioTest) {
-                    Text("Go to Audio Test")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    Button(onClick = { isCameraEnabled = !isCameraEnabled }) {
+                        Text(if (isCameraEnabled) "close camera" else "open camera")
+                    }
+                    Button(onClick = onNavigateToAudioTest) {
+                        Text("Go to Audio Test")
+                    }
                 }
                 Box(modifier = Modifier.weight(0.3f)) {
                     WifiInfoView()
@@ -160,8 +167,9 @@ fun WifiInfoView() {
                 IP Address: $ipString
                 Link Speed: ${connectionInfo.linkSpeed} Mbps
                 RSSI: ${connectionInfo.rssi} dBm
+                Status: $reconnectStatusText
             """.trimIndent()
-            delay(1000L) // 每隔1秒刷新一次
+            delay(2000L) // 每隔2秒刷新一次
         }
     }
 
@@ -170,13 +178,6 @@ fun WifiInfoView() {
         modifier = Modifier
             .fillMaxWidth()
             .background(Color.White)
-            .padding(16.dp)
-    )
-    Text(
-        text = "reconnect status: $reconnectStatusText",
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color.Cyan)
             .padding(16.dp)
     )
 }
