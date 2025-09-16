@@ -63,6 +63,8 @@ fun MainScreen(
             Manifest.permission.ACCESS_FINE_LOCATION
         )
     )
+    var isCameraEnabled by remember { mutableStateOf(true) }
+
 
     LaunchedEffect(permissionsState.allPermissionsGranted) {
         if (!permissionsState.allPermissionsGranted) {
@@ -78,10 +80,12 @@ fun MainScreen(
         ) {
             if (permissionsState.allPermissionsGranted) {
                 Box(modifier = Modifier.weight(0.4f)) {
-                    CameraPreview(
-                        modifier = Modifier.fillMaxSize(),
-                        recorderState = recorderState
-                    )
+                    if (isCameraEnabled) {
+                        CameraPreview(
+                            modifier = Modifier.fillMaxSize(),
+                            recorderState = recorderState
+                        )
+                    }
                     if (recorderState.isRecording) {
                         Box(
                             modifier = Modifier
@@ -91,6 +95,9 @@ fun MainScreen(
                                 .padding(16.dp)
                         )
                     }
+                }
+                Button(onClick = { isCameraEnabled = !isCameraEnabled }) {
+                    Text(if (isCameraEnabled) "关闭摄像头" else "开启摄像头")
                 }
                 Button(onClick = onNavigateToAudioTest) {
                     Text("Go to Audio Test")
