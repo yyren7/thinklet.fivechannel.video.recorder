@@ -16,6 +16,8 @@ class AudioTestViewModel(application: Application, lifecycle: Lifecycle) : Andro
 
     private val audioManager: AudioManager = application.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val tts: TextToSpeech = TextToSpeech(application, this)
+    private var ringtone: android.media.Ringtone? = null
+
 
     init {
         // 初期化リスナーを設定
@@ -52,12 +54,19 @@ class AudioTestViewModel(application: Application, lifecycle: Lifecycle) : Andro
 
     fun playRingtone(context: Context) {
         try {
-            val ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
-            val ringtone = RingtoneManager.getRingtone(context, ringtoneUri)
-            ringtone.play()
+            if (ringtone == null) {
+                val ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+                ringtone = RingtoneManager.getRingtone(context, ringtoneUri)
+            }
+            ringtone?.play()
         } catch (e: Exception) {
             e.printStackTrace()
         }
+    }
+
+    fun stopRingtone() {
+        ringtone?.stop()
+        ringtone = null
     }
 
     fun playTtsMessage() {
@@ -67,6 +76,8 @@ class AudioTestViewModel(application: Application, lifecycle: Lifecycle) : Andro
     override fun onCleared() {
         tts.stop()
         tts.shutdown()
+        ringtone?.stop()
+        ringtone = null
         super.onCleared()
     }
 }

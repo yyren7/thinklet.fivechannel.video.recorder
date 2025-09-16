@@ -74,6 +74,10 @@ fun AudioTestScreen(
         Button(onClick = { audioTestViewModel.playRingtone(context) }) {
             Text("播放铃声")
         }
+        Spacer(modifier = Modifier.height(8.dp))
+        Button(onClick = { audioTestViewModel.stopRingtone() }) {
+            Text("停止播放铃声")
+        }
         Spacer(modifier = Modifier.height(16.dp))
 
         // 媒体音量
