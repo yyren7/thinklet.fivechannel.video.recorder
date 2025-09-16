@@ -120,7 +120,7 @@ fun WifiInfoView() {
     var wifiInfoText by remember { mutableStateOf("Loading Wi-Fi info...") }
     var reconnectStatusText by remember { mutableStateOf("正在初始化监控...") }
 
-    // 在这里定义你想要自动重连的目标Wi-Fi名称
+    // define the target ssid
     val targetSsid = "ncjfrnw"
 
     val wifiReconnectManager = remember {
@@ -173,7 +173,7 @@ fun WifiInfoView() {
             .padding(16.dp)
     )
     Text(
-        text = "重连状态: $reconnectStatusText",
+        text = "reconnect status: $reconnectStatusText",
         modifier = Modifier
             .fillMaxWidth()
             .background(Color.Cyan)

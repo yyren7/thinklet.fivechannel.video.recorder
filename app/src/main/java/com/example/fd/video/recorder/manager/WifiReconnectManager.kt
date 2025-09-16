@@ -39,11 +39,11 @@ class WifiReconnectManager(private val context: Context, private val onStatusUpd
                 val success = intent.getBooleanExtra(WifiManager.EXTRA_RESULTS_UPDATED, false)
                 if (success) {
                     Log.d(TAG, "Wi-Fi scan successful.")
-                    onStatusUpdate("扫描成功，正在查找目标网络...")
+                    onStatusUpdate("scan successful, searching for target network...")
                     connectToTargetWifi()
                 } else {
                     Log.w(TAG, "Wi-Fi scan failed.")
-                    onStatusUpdate("扫描失败，将重试...")
+                    onStatusUpdate("scan failed, will retry...")
                     reconnectionJob = coroutineScope.launch {
                         delay(5000)
                         scanAndReconnect()
@@ -61,28 +61,28 @@ class WifiReconnectManager(private val context: Context, private val onStatusUpd
         }
         this.targetSsid = ssid
         Log.d(TAG, "Starting network monitoring for SSID: $targetSsid")
-        onStatusUpdate("开始监控网络状态...")
+        onStatusUpdate("starting network monitoring...")
 
         networkCallback = object : ConnectivityManager.NetworkCallback() {
             override fun onLost(network: Network) {
                 super.onLost(network)
                 Log.w(TAG, "Network connection lost!")
-                onStatusUpdate("网络连接已断开，准备重连...")
+                onStatusUpdate("network connection lost, preparing to reconnect...")
                 
-                // 检查当前是否还有活动的Wi-Fi连接
+                // check if there is any active wifi connection
                 val activeNetwork = connectivityManager.activeNetwork
                 val capabilities = connectivityManager.getNetworkCapabilities(activeNetwork)
                 val isWifiConnected = capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ?: false
 
                 if (!isWifiConnected) {
-                    reconnectionJob?.cancel() // 取消之前的重连任务
+                    reconnectionJob?.cancel() // cancel the previous reconnect task
                     reconnectionJob = coroutineScope.launch {
-                        delay(1000) // 稍作延迟，等待网络状态稳定
+                        delay(1000) // wait for the network state to stabilize
                         scanAndReconnect()
                     }
                 } else {
                     Log.d(TAG, "Another Wi-Fi network is active. No need to reconnect.")
-                    onStatusUpdate("已连接到其他Wi-Fi网络。")
+                    onStatusUpdate("connected to another wifi network, no need to reconnect.")
                 }
             }
         }
@@ -96,7 +96,7 @@ class WifiReconnectManager(private val context: Context, private val onStatusUpd
     private fun scanAndReconnect() {
         if (targetSsid == null) return
         Log.d(TAG, "Scanning for Wi-Fi networks...")
-        onStatusUpdate("正在扫描Wi-Fi...")
+        onStatusUpdate("scanning for wifi networks...")
 
         val intentFilter = IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)
         context.registerReceiver(wifiScanReceiver, intentFilter)
@@ -104,7 +104,7 @@ class WifiReconnectManager(private val context: Context, private val onStatusUpd
         if (!wifiManager.startScan()) {
              context.unregisterReceiver(wifiScanReceiver)
              Log.e(TAG, "startScan failed. Retrying in 5s.")
-             onStatusUpdate("启动扫描失败，5秒后重试...")
+             onStatusUpdate("failed to start scan, will retry in 5s...")
              coroutineScope.launch {
                  delay(5000)
                  scanAndReconnect()
@@ -121,11 +121,11 @@ class WifiReconnectManager(private val context: Context, private val onStatusUpd
 
         if (targetNetwork != null) {
             Log.d(TAG, "Target network '$target' found.")
-            onStatusUpdate("找到目标网络，正在连接...")
+            onStatusUpdate("target network found, connecting...")
             connectToWifi(target)
         } else {
             Log.w(TAG, "Target network '$target' not in scan results. Retrying scan in 10s.")
-            onStatusUpdate("未找到目标网络，10秒后重新扫描...")
+            onStatusUpdate("target network not found, will retry scan in 10s...")
             reconnectionJob = coroutineScope.launch {
                 delay(10000)
                 scanAndReconnect()
@@ -142,13 +142,13 @@ class WifiReconnectManager(private val context: Context, private val onStatusUpd
             wifiManager.enableNetwork(existingConfig.networkId, true)
         } else {
             Log.w(TAG, "No configuration found for '$ssid'. This implementation does not support adding new networks with passwords.")
-             onStatusUpdate("找不到 '$ssid' 的网络配置。请先手动连接一次。")
+             onStatusUpdate("no configuration found for '$ssid', please connect manually first.")
         }
     }
 
     fun stopMonitoring() {
         Log.d(TAG, "Stopping network monitoring")
-        onStatusUpdate("停止监控。")
+        onStatusUpdate("stopping network monitoring...")
         networkCallback?.let {
             try {
                 connectivityManager.unregisterNetworkCallback(it)
