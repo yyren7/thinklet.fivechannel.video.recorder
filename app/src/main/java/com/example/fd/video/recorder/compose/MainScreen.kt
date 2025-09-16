@@ -43,6 +43,7 @@ import android.net.NetworkCapabilities
 import android.net.wifi.WifiInfo
 import androidx.compose.runtime.rememberUpdatedState
 import android.annotation.SuppressLint
+import com.example.fd.video.recorder.manager.WifiReconnectManager
 
 /**
  * カメラのPreviewを表示．録画中は右上に緑色の丸図形を描画する Compose．
@@ -110,6 +111,23 @@ fun MainScreen(
 fun WifiInfoView() {
     val context = LocalContext.current
     var wifiInfoText by remember { mutableStateOf("Loading Wi-Fi info...") }
+    var reconnectStatusText by remember { mutableStateOf("正在初始化监控...") }
+
+    // 在这里定义你想要自动重连的目标Wi-Fi名称
+    val targetSsid = "ncjfrnw"
+
+    val wifiReconnectManager = remember {
+        WifiReconnectManager(context) { status ->
+            reconnectStatusText = status
+        }
+    }
+
+    DisposableEffect(Unit) {
+        wifiReconnectManager.startMonitoring(targetSsid)
+        onDispose {
+            wifiReconnectManager.stopMonitoring()
+        }
+    }
 
     LaunchedEffect(Unit) {
         val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
@@ -145,6 +163,13 @@ fun WifiInfoView() {
         modifier = Modifier
             .fillMaxWidth()
             .background(Color.White)
+            .padding(16.dp)
+    )
+    Text(
+        text = "重连状态: $reconnectStatusText",
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.Cyan)
             .padding(16.dp)
     )
 }
