@@ -93,6 +93,7 @@ dependencies {
     implementation(thinkletLibs.camerax.mic.xfe)
     // THINKLET向けのSDKを追加
     implementation(thinkletLibs.sdk.audio)
+    implementation(thinkletLibs.sdk.maintenance)
 
     // https://github.com/FairyDevicesRD/thinklet.camerax.vision
     implementation(project(":vision"))
