@@ -1,5 +1,6 @@
 package ai.fd.thinklet.camerax.vision
 
+import ai.fd.thinklet.camerax.vision.httpserver.VisionRepository
 import ai.fd.thinklet.camerax.vision.httpserver.impl.VisionRepositoryImpl
 import android.graphics.Bitmap
 import android.graphics.Matrix
@@ -13,7 +14,11 @@ import java.io.ByteArrayOutputStream
  * The supported ImageProxy format is ImageFormat. YUV_420_888, ImageFormat. JPEG or PixelFormat. RGBA_8888.
  */
 class Vision : ImageAnalysis.Analyzer {
-    private val visionRepository = VisionRepositoryImpl()
+    private val visionRepository: VisionRepository = VisionRepositoryImpl()
+
+    fun setClientConnectionListener(listener: ClientConnectionListener?) {
+        visionRepository.setClientConnectionListener(listener)
+    }
 
     /**
      * HTTPサーバーを [port] で起動します．

@@ -53,7 +53,21 @@ internal class ThinkletRecorder private constructor(
     @GuardedBy("recordingLock")
     private var recording: Recording? = null
     private val previewUseCase: Preview = Preview.Builder().build()
-    private var camera: Camera? = null
+    private val videoCaptureUseCase: VideoCapture<Recorder>
+    private val analyzerUseCase: ImageAnalysis?
+    internal var camera: Camera? = null
+    private var visionUseCaseEnabled: Boolean
+    private var previewEnabled: Boolean
+
+    init {
+        videoCaptureUseCase = VideoCapture.Builder(recorder).build()
+        analyzerUseCase = Companion.analyzerUseCase
+        visionUseCaseEnabled = false
+        previewEnabled = false
+        bind()
+    }
+
+    fun isRecording(): Boolean = recordingLock.withLock { recording != null }
 
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     fun startRecording(outputFile: File, outputAudioFile: File): Boolean = recordingLock.withLock {
@@ -102,21 +116,56 @@ internal class ThinkletRecorder private constructor(
     }
 
     fun setPreviewSurfaceProvider(surfaceProvider: Preview.SurfaceProvider?) {
-        if (surfaceProvider != null) {
+        previewUseCase.setSurfaceProvider(surfaceProvider)
+        val enabled = surfaceProvider != null
+        if (previewEnabled == enabled) {
+            return
+        }
+        previewEnabled = enabled
+        if (isRecording()) {
+            return
+        }
+        bind()
+    }
+
+    fun enableVisionUseCase(enabled: Boolean) {
+        if (visionUseCaseEnabled == enabled) {
+            return
+        }
+        visionUseCaseEnabled = enabled
+        if (isRecording()) {
+            return
+        }
+        bind()
+    }
+
+    fun rebindUseCases() {
+        bind()
+    }
+
+    @MainThread
+    private fun bind() {
+        val useCaseGroup = UseCaseGroup.Builder()
+            .addUseCase(videoCaptureUseCase)
+            .addUseCaseIfPresent(if (visionUseCaseEnabled) analyzerUseCase else null)
+            .addUseCaseIfPresent(if (previewEnabled) previewUseCase else null)
+            .build()
+        camera = runCatching {
+            cameraProvider.unbindAll()
             cameraProvider.bindToLifecycle(
                 lifecycleOwner,
                 CameraSelector.DEFAULT_BACK_CAMERA,
-                previewUseCase
+                useCaseGroup
             )
-            previewUseCase.setSurfaceProvider(surfaceProvider)
-        } else {
-            cameraProvider.unbind(previewUseCase)
-        }
+        }.onFailure {
+            Logging.e("Use case binding failed")
+        }.getOrNull()
     }
 
     companion object {
 
         const val MAX_FILE_SIZE = 4L * 1000 * 1000 * 1000
+        private var analyzerUseCase: ImageAnalysis? = null
 
         /**
          * [ThinkletRecorder]のインスタンスを作成します
@@ -150,19 +199,13 @@ internal class ThinkletRecorder private constructor(
             val videoCaptureUseCase = VideoCapture.Builder(recorder).build()
 
             // Vision機能用のAnalyzer
-            val analyzerUseCase = if (analyzer != null) {
+            analyzerUseCase = if (analyzer != null) {
                 AnalyzerConfigure(analyzer).build()
             } else {
                 null
             }
 
-            val useCaseGroup = UseCaseGroup.Builder()
-                .addUseCase(videoCaptureUseCase)
-                .addUseCaseIfPresent(analyzerUseCase)
-                .build()
-
             val cameraProvider = ProcessCameraProvider.getInstance(context).await()
-            val camera = bind(cameraProvider, lifecycleOwner, useCaseGroup)
             return ThinkletRecorder(
                 context,
                 recorder,

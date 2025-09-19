@@ -48,6 +48,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
+import ai.fd.thinklet.camerax.vision.ClientConnectionListener
+import ai.fd.thinklet.camerax.vision.httpserver.VisionRepository
+import androidx.camera.core.CameraState
 
 /**
  * [ThinkletRecorder]と連携し、UI用のデータの提供やUIからのイベントを処理するクラス
@@ -116,6 +119,23 @@ class RecorderState(
         }
         lifecycleOwner.lifecycleScope.launch {
             lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                vision?.setClientConnectionListener(object : ClientConnectionListener {
+                    override fun onClientConnected() {
+                        lifecycleOwner.lifecycleScope.launch {
+                            recorderMutex.withLock {
+                                recorder?.enableVisionUseCase(true)
+                            }
+                        }
+                    }
+
+                    override fun onClientDisconnected() {
+                        lifecycleOwner.lifecycleScope.launch {
+                            recorderMutex.withLock {
+                                recorder?.enableVisionUseCase(false)
+                            }
+                        }
+                    }
+                })
                 vision?.start(port = visionPort)
                 try {
                     awaitCancellation()
@@ -158,6 +178,21 @@ class RecorderState(
                         rawAudioRecCaptureRepository = rawAudioRecCaptureRepository,
                         recordEventListener = ::handleRecordEvent,
                     )
+                    recorder?.camera?.cameraInfo?.cameraState?.observe(lifecycleOwner) { cameraState ->
+                        cameraState.error?.let { error ->
+                            val cause = error.cause
+                            val errorCode = when (error.code) {
+                                CameraState.ERROR_CAMERA_IN_USE -> "ERROR_CAMERA_IN_USE"
+                                CameraState.ERROR_MAX_CAMERAS_IN_USE -> "ERROR_MAX_CAMERAS_IN_USE"
+                                CameraState.ERROR_OTHER_RECOVERABLE_ERROR -> "ERROR_OTHER_RECOVERABLE_ERROR"
+                                CameraState.ERROR_CAMERA_DISABLED -> "ERROR_CAMERA_DISABLED"
+                                CameraState.ERROR_CAMERA_FATAL_ERROR -> "ERROR_CAMERA_FATAL_ERROR"
+                                CameraState.ERROR_DO_NOT_DISTURB_MODE_ENABLED -> "ERROR_DO_NOT_DISTURB_MODE_ENABLED"
+                                else -> "UNKNOWN_ERROR"
+                            }
+                            Logging.e("Camera state error: $errorCode, cause: ${cause?.message}", cause)
+                        }
+                    }
                 }
                 recorder?.setPreviewSurfaceProvider(surfaceProvider)
             }
@@ -213,6 +248,11 @@ class RecorderState(
                 tts.speak("recording finished", TextToSpeech.QUEUE_FLUSH, null, "")
                 lifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
                     _isRecording.value = false
+                }
+                lifecycleOwner.lifecycleScope.launch {
+                    recorderMutex.withLock {
+                        recorder?.rebindUseCases()
+                    }
                 }
                 if (isKeepRecording.get()) {
                     // 次の動画を撮影

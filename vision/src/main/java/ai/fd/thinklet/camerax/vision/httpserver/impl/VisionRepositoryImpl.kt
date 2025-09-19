@@ -1,5 +1,6 @@
 package ai.fd.thinklet.camerax.vision.httpserver.impl
 
+import ai.fd.thinklet.camerax.vision.ClientConnectionListener
 import ai.fd.thinklet.camerax.vision.httpserver.VisionRepository
 import android.util.Log
 import io.ktor.http.ContentType
@@ -11,6 +12,8 @@ import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytes
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
+import java.util.Timer
+import java.util.TimerTask
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.thread
 import kotlin.concurrent.withLock
@@ -19,6 +22,12 @@ internal class VisionRepositoryImpl : VisionRepository {
     private var serverThread: Thread? = null
     private val cacheLock = ReentrantLock()
     private var cacheImage: ByteArray? = null
+    private var listener: ClientConnectionListener? = null
+    private var disconnectTimer: TimerTask? = null
+
+    override fun setClientConnectionListener(listener: ClientConnectionListener?) {
+        this.listener = listener
+    }
 
     override fun start(port: Int) {
         serverThread = createServer(port)
@@ -51,6 +60,8 @@ internal class VisionRepositoryImpl : VisionRepository {
                     )
                 }
                 get("/image") {
+                    listener?.onClientConnected()
+                    resetDisconnectTimer()
                     val img = cacheLock.withLock { cacheImage?.copyOf() }
                     if (img != null) {
                         call.respondBytes(
@@ -77,6 +88,16 @@ internal class VisionRepositoryImpl : VisionRepository {
                 }
             }
         }
+    }
+
+    private fun resetDisconnectTimer() {
+        disconnectTimer?.cancel()
+        disconnectTimer = object : TimerTask() {
+            override fun run() {
+                listener?.onClientDisconnected()
+            }
+        }
+        Timer().schedule(disconnectTimer, 5000)
     }
 
     private fun buildIndexHtml(reload: Int = 1000): ByteArray {
