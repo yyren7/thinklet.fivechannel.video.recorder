@@ -170,12 +170,6 @@ internal class ThinkletRecorder private constructor(
             useCaseGroup: UseCaseGroup
         ) {
             runCatching {
-                cameraProvider.unbindAll()
-            }.onFailure {
-                Logging.w("Failed to unbindAll")
-            }
-
-            runCatching {
                 cameraProvider.bindToLifecycle(
                     lifecycleOwner,
                     CameraSelector.DEFAULT_BACK_CAMERA,

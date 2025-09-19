@@ -147,7 +147,7 @@ class RecorderState(
     }
 
     fun registerSurfaceProvider(surfaceProvider: Preview.SurfaceProvider?) {
-        lifecycleOwner.lifecycleScope.launch {
+        lifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
             recorderMutex.withLock {
                 recorder = ThinkletRecorder.create(
                     context = context,
