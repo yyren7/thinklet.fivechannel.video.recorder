@@ -1,114 +1,108 @@
 package com.example.fd.video.recorder.compose
 
 import android.Manifest
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
-import android.net.wifi.WifiManager
-import android.os.BatteryManager
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.camera.view.PreviewView
+import com.example.fd.video.recorder.R
 import com.example.fd.video.recorder.RecorderState
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.delay
 import java.math.BigInteger
 import java.net.InetAddress
 import java.nio.ByteOrder
-import android.net.ConnectivityManager
-import android.net.Network
-import android.net.NetworkCapabilities
-import android.net.wifi.WifiInfo
-import androidx.compose.runtime.rememberUpdatedState
-import android.annotation.SuppressLint
-import com.example.fd.video.recorder.manager.WifiReconnectManager
+import android.net.wifi.WifiManager
+import androidx.compose.runtime.LaunchedEffect
 
-/**
- * カメラのPreviewを表示．録画中は右上に緑色の丸図形を描画する Compose．
- */
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun MainScreen(
-    recorderState: RecorderState,
     modifier: Modifier = Modifier,
+    recorderState: RecorderState,
     onNavigateToAudioTest: () -> Unit
 ) {
-    val permissionsState = rememberMultiplePermissionsState(
+    val permissionState = rememberMultiplePermissionsState(
         permissions = listOf(
-            Manifest.permission.RECORD_AUDIO,
             Manifest.permission.CAMERA,
-            Manifest.permission.ACCESS_WIFI_STATE,
-            Manifest.permission.ACCESS_FINE_LOCATION
+            Manifest.permission.RECORD_AUDIO
         )
     )
-    var isCameraEnabled by remember { mutableStateOf(true) }
 
+    when {
+        permissionState.allPermissionsGranted -> {
+            var showPreview by remember { mutableStateOf(false) }
+            val lifecycleOwner = LocalLifecycleOwner.current
+            DisposableEffect(lifecycleOwner) {
+                onDispose {
+                    recorderState.releaseRecorder()
+                }
+            }
+            SideEffect {
+                if (!showPreview) {
+                    recorderState.setPreviewSurfaceProvider(null)
+                }
+            }
 
-    LaunchedEffect(permissionsState.allPermissionsGranted) {
-        if (!permissionsState.allPermissionsGranted) {
-            permissionsState.launchMultiplePermissionRequest()
-        }
-    }
-
-    Scaffold(modifier = modifier) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .padding(innerPadding)
-                .fillMaxSize()
-        ) {
-            if (permissionsState.allPermissionsGranted) {
-                Box(modifier = Modifier.weight(0.4f)) {
-                    if (isCameraEnabled) {
-                        CameraPreview(
+            Column(
+                modifier = modifier,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(modifier = Modifier.weight(0.4f).fillMaxWidth()) {
+                    if (showPreview) {
+                        AndroidView(
+                            factory = { context ->
+                                PreviewView(context)
+                            },
                             modifier = Modifier.fillMaxSize(),
-                            recorderState = recorderState
-                        )
-                    }
-                    if (recorderState.isRecording) {
-                        Box(
-                            modifier = Modifier
-                                .size(16.dp)
-                                .background(Color.Green, shape = CircleShape)
-                                .align(Alignment.TopEnd)
-                                .padding(16.dp)
+                            update = { previewView ->
+                                recorderState.setPreviewSurfaceProvider(previewView.surfaceProvider)
+                            }
                         )
                     }
                 }
+
+                Text(text = if (recorderState.isRecording) "Recording" else "Stopped")
+
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    Button(onClick = { isCameraEnabled = !isCameraEnabled }) {
-                        Text(if (isCameraEnabled) "close camera" else "open camera")
+                    Button(onClick = { showPreview = !showPreview }) {
+                        Text(if (showPreview) "Hide Preview" else "Show Preview")
                     }
                     Button(onClick = onNavigateToAudioTest) {
-                        Text("Go to Audio Test")
+                        Text("Audio Test")
                     }
                 }
+
                 Box(modifier = Modifier.weight(0.3f)) {
                     WifiInfoView()
                 }
@@ -117,31 +111,25 @@ fun MainScreen(
                 }
             }
         }
+        else -> {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("Camera and Audio permissions are required.")
+                Button(onClick = { permissionState.launchMultiplePermissionRequest() }) {
+                    Text("Request Permissions")
+                }
+            }
+        }
     }
 }
 
-@SuppressLint("MissingPermission")
 @Composable
 fun WifiInfoView() {
     val context = LocalContext.current
     var wifiInfoText by remember { mutableStateOf("Loading Wi-Fi info...") }
-    var reconnectStatusText by remember { mutableStateOf("正在初始化监控...") }
-
-    // define the target ssid
-    val targetSsid = "ncjfrnw"
-
-    val wifiReconnectManager = remember {
-        WifiReconnectManager(context) { status ->
-            reconnectStatusText = status
-        }
-    }
-
-    DisposableEffect(Unit) {
-        wifiReconnectManager.startMonitoring(targetSsid)
-        onDispose {
-            wifiReconnectManager.stopMonitoring()
-        }
-    }
 
     LaunchedEffect(Unit) {
         val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
@@ -155,7 +143,7 @@ fun WifiInfoView() {
             }
             val ipString = BigInteger.valueOf(ip.toLong()).toByteArray().let {
                 try {
-                    InetAddress.getByAddress(it).hostAddress
+                    InetAddress.getByAddress(it).hostAddress ?: "N/A"
                 } catch (e: Exception) {
                     "N/A"
                 }
@@ -163,13 +151,10 @@ fun WifiInfoView() {
 
             wifiInfoText = """
                 SSID: ${connectionInfo.ssid}
-                BSSID: ${connectionInfo.bssid}
                 IP Address: $ipString
-                Link Speed: ${connectionInfo.linkSpeed} Mbps
                 RSSI: ${connectionInfo.rssi} dBm
-                Status: $reconnectStatusText
             """.trimIndent()
-            delay(2000L) // 每隔2秒刷新一次
+            delay(2000L)
         }
     }
 
@@ -202,11 +187,10 @@ fun BatteryInfoView() {
 
                     val chargeCurrent = batteryManager.getLongProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW) / 1000
 
-
                     batteryInfoText = """
                         Battery Level: ${batteryPct.toInt()}%
-                        Charging Status: ${if (isCharging) "Charging" else "Discharging"}
-                        Charge Current: $chargeCurrent mA
+                        Status: ${if (isCharging) "Charging" else "Discharging"}
+                        Current: $chargeCurrent mA
                     """.trimIndent()
                 }
             }

@@ -146,18 +146,20 @@ class RecorderState(
         }
     }
 
-    fun registerSurfaceProvider(surfaceProvider: Preview.SurfaceProvider?) {
-        lifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+    fun setPreviewSurfaceProvider(surfaceProvider: Preview.SurfaceProvider?) {
+        lifecycleOwner.lifecycleScope.launch {
             recorderMutex.withLock {
-                recorder = ThinkletRecorder.create(
-                    context = context,
-                    lifecycleOwner = lifecycleOwner,
-                    mic = micType(),
-                    analyzer = vision,
-                    previewSurfaceProvider = surfaceProvider,
-                    rawAudioRecCaptureRepository = rawAudioRecCaptureRepository,
-                    recordEventListener = ::handleRecordEvent,
-                )
+                if (recorder == null) {
+                    recorder = ThinkletRecorder.create(
+                        context = context,
+                        lifecycleOwner = lifecycleOwner,
+                        mic = micType(),
+                        analyzer = vision,
+                        rawAudioRecCaptureRepository = rawAudioRecCaptureRepository,
+                        recordEventListener = ::handleRecordEvent,
+                    )
+                }
+                recorder?.setPreviewSurfaceProvider(surfaceProvider)
             }
         }
     }
@@ -170,9 +172,6 @@ class RecorderState(
 
     private suspend fun toggleRecordStateInternal() = recorderMutex.withLock {
         val localRecorder = recorder ?: return@withLock
-
-        val keep = isKeepRecording.get()
-        isKeepRecording.set(!keep)
 
         if (_isRecording.value) {
             localRecorder.requestStop()
@@ -204,13 +203,17 @@ class RecorderState(
             is VideoRecordEvent.Start -> {
                 playMediaActionSound(MediaActionSound.START_VIDEO_RECORDING)
                 tts.speak("recording started", TextToSpeech.QUEUE_FLUSH, null, "")
-                _isRecording.value = true
+                lifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
+                    _isRecording.value = true
+                }
             }
 
             is VideoRecordEvent.Finalize -> {
                 playMediaActionSound(MediaActionSound.STOP_VIDEO_RECORDING)
                 tts.speak("recording finished", TextToSpeech.QUEUE_FLUSH, null, "")
-                _isRecording.value = false
+                lifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
+                    _isRecording.value = false
+                }
                 if (isKeepRecording.get()) {
                     // 次の動画を撮影
                     lifecycleOwner.lifecycleScope.launch {

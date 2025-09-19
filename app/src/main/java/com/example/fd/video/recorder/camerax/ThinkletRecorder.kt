@@ -6,6 +6,7 @@ import android.content.Context
 import androidx.annotation.GuardedBy
 import androidx.annotation.MainThread
 import androidx.annotation.RequiresPermission
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
@@ -42,6 +43,8 @@ internal class ThinkletRecorder private constructor(
     private val recorder: Recorder,
     private val recordEventListener: (VideoRecordEvent) -> Unit,
     private val rawAudioRecCaptureRepository: RawAudioRecCaptureRepository,
+    private val cameraProvider: ProcessCameraProvider,
+    private val lifecycleOwner: LifecycleOwner,
     private val recorderListenerExecutor: ExecutorService = Executors.newSingleThreadExecutor(),
     private val fileSize: Long = BuildConfig.FILE_SIZE
 ) {
@@ -49,6 +52,8 @@ internal class ThinkletRecorder private constructor(
 
     @GuardedBy("recordingLock")
     private var recording: Recording? = null
+    private val previewUseCase: Preview = Preview.Builder().build()
+    private var camera: Camera? = null
 
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     fun startRecording(outputFile: File, outputAudioFile: File): Boolean = recordingLock.withLock {
@@ -96,6 +101,19 @@ internal class ThinkletRecorder private constructor(
         }
     }
 
+    fun setPreviewSurfaceProvider(surfaceProvider: Preview.SurfaceProvider?) {
+        if (surfaceProvider != null) {
+            cameraProvider.bindToLifecycle(
+                lifecycleOwner,
+                CameraSelector.DEFAULT_BACK_CAMERA,
+                previewUseCase
+            )
+            previewUseCase.setSurfaceProvider(surfaceProvider)
+        } else {
+            cameraProvider.unbind(previewUseCase)
+        }
+    }
+
     companion object {
 
         const val MAX_FILE_SIZE = 4L * 1000 * 1000 * 1000
@@ -108,7 +126,6 @@ internal class ThinkletRecorder private constructor(
          * @param lifecycleOwner カメラのライフサイクルと紐付ける[LifecycleOwner]
          * @param mic 使用するTHINKLET独自のマイク機能
          * @param analyzer カメラAnalyzer
-         * @param previewSurfaceProvider プレビューを表示する[PreviewView]から取得した[Preview.SurfaceProvider]
          * @param recordEventListener CameraX側からの[VideoRecordEvent]イベントを受け取るリスナー
          * @param rawAudioRecCaptureRepository 5ch音声の録音を行う[RawAudioRecCaptureRepository]
          * @param recorderExecutor [recordEventListener]の実行スレッドを指定する[ExecutorService]
@@ -119,7 +136,6 @@ internal class ThinkletRecorder private constructor(
             lifecycleOwner: LifecycleOwner,
             mic: ThinkletMic?,
             analyzer: ImageAnalysis.Analyzer?,
-            previewSurfaceProvider: Preview.SurfaceProvider? = null,
             recordEventListener: (VideoRecordEvent) -> Unit = {},
             rawAudioRecCaptureRepository: RawAudioRecCaptureRepository,
             recorderExecutor: ExecutorService = Executors.newSingleThreadExecutor()
@@ -139,27 +155,21 @@ internal class ThinkletRecorder private constructor(
             } else {
                 null
             }
-            val previewUseCase = if (previewSurfaceProvider != null) {
-                Preview.Builder().build().apply {
-                    surfaceProvider = previewSurfaceProvider
-                }
-            } else {
-                null
-            }
 
             val useCaseGroup = UseCaseGroup.Builder()
                 .addUseCase(videoCaptureUseCase)
                 .addUseCaseIfPresent(analyzerUseCase)
-                .addUseCaseIfPresent(previewUseCase)
                 .build()
 
             val cameraProvider = ProcessCameraProvider.getInstance(context).await()
-            bind(cameraProvider, lifecycleOwner, useCaseGroup)
+            val camera = bind(cameraProvider, lifecycleOwner, useCaseGroup)
             return ThinkletRecorder(
                 context,
                 recorder,
                 recordEventListener,
-                rawAudioRecCaptureRepository
+                rawAudioRecCaptureRepository,
+                cameraProvider,
+                lifecycleOwner
             )
         }
 
@@ -168,8 +178,8 @@ internal class ThinkletRecorder private constructor(
             cameraProvider: ProcessCameraProvider,
             lifecycleOwner: LifecycleOwner,
             useCaseGroup: UseCaseGroup
-        ) {
-            runCatching {
+        ): Camera? {
+            return runCatching {
                 cameraProvider.bindToLifecycle(
                     lifecycleOwner,
                     CameraSelector.DEFAULT_BACK_CAMERA,
@@ -177,7 +187,7 @@ internal class ThinkletRecorder private constructor(
                 )
             }.onFailure {
                 Logging.e("Use case binding failed")
-            }
+            }.getOrNull()
         }
 
         private fun Recorder.Builder.setThinkletMicIfPresent(mic: ThinkletMic?): Recorder.Builder =
