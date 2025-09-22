@@ -43,13 +43,15 @@ import android.net.wifi.WifiManager
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun MainScreen(
     modifier: Modifier = Modifier,
     recorderState: RecorderState,
-    onNavigateToAudioTest: () -> Unit
+    onNavigateToTest: () -> Unit
 ) {
     val permissionState = rememberMultiplePermissionsState(
         permissions = listOf(
@@ -121,8 +123,8 @@ fun MainScreen(
                     Button(onClick = { recorderState.setPreviewEnabled(!recorderState.isPreviewEnabled) }) {
                         Text(if (recorderState.isPreviewEnabled) "Hide Preview" else "Show Preview")
                     }
-                    Button(onClick = onNavigateToAudioTest) {
-                        Text("Audio Test")
+                    Button(onClick = onNavigateToTest) {
+                        Text("Test")
                     }
                 }
 

@@ -8,8 +8,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
-import com.example.fd.video.recorder.compose.AudioTestScreen
 import com.example.fd.video.recorder.compose.MainScreen
+import com.example.fd.video.recorder.compose.TestScreen
 import com.example.fd.video.recorder.ui.theme.MultiMicVideoRecorderTheme
 import android.util.Log
 import androidx.compose.runtime.getValue
@@ -50,16 +50,16 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         window.addFlags(FLAG_KEEP_SCREEN_ON)
         setContent {
-            var showAudioTestScreen by remember { mutableStateOf(false) }
+            var showTestScreen by remember { mutableStateOf(false) }
 
             MultiMicVideoRecorderTheme {
-                if (showAudioTestScreen) {
-                    AudioTestScreen(onNavigateBack = { showAudioTestScreen = false })
+                if (showTestScreen) {
+                    TestScreen(onNavigateBack = { showTestScreen = false })
                 } else {
                     MainScreen(
                         modifier = Modifier.fillMaxSize(),
                         recorderState = recorderState,
-                        onNavigateToAudioTest = { showAudioTestScreen = true }
+                        onNavigateToTest = { showTestScreen = true }
                     )
                 }
             }
