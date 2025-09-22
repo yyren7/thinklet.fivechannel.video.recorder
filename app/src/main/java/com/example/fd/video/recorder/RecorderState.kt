@@ -47,7 +47,6 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.util.concurrent.atomic.AtomicBoolean
 import ai.fd.thinklet.camerax.vision.ClientConnectionListener
 import ai.fd.thinklet.camerax.vision.httpserver.VisionRepository
 import androidx.camera.core.CameraState
@@ -77,9 +76,6 @@ class RecorderState(
     private val _isRebinding: MutableState<Boolean> = mutableStateOf(false)
     val isRebinding: Boolean
         get() = _isRebinding.value
-
-    // true == record next video
-    private val isKeepRecording = AtomicBoolean(false)
 
     @GuardedBy("mediaActionSoundMutex")
     private var mediaActionSound: MediaActionSound? = null
@@ -120,7 +116,6 @@ class RecorderState(
                     awaitCancellation()
                 } finally {
                     recorderMutex.withLock {
-                        isKeepRecording.set(false)
                         recorder?.requestStop()
                     }
                 }
@@ -162,6 +157,7 @@ class RecorderState(
     }
 
     fun release() {
+        vision?.stop()
         tts.stop()
         tts.shutdown()
     }
@@ -236,7 +232,14 @@ class RecorderState(
         }
         lifecycleOwner.lifecycleScope.launch {
             recorderMutex.withLock {
-                recorder?.prepareToRecord(enableVision, enablePreview)
+                val (previewState, visionState) = recorder?.prepareToRecord(enableVision, enablePreview) ?: (false to false)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        context,
+                        "保存的状态: Preview=$previewState, Vision=$visionState",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
             }
         }
     }
@@ -253,7 +256,6 @@ class RecorderState(
         if (_isRecording.value) {
             localRecorder.requestStop()
         } else {
-            recorder?.prepareToRecord(recorder?.isVisionUseCaseEnabled() ?: false, isPreviewEnabled)
             localRecorder.requestStart()
         }
     }
@@ -287,6 +289,9 @@ class RecorderState(
             }
 
             is VideoRecordEvent.Finalize -> {
+                // 确保音频录制已停止（双重保险）
+                rawAudioRecCaptureRepository.stopRecording()
+                
                 playMediaActionSound(MediaActionSound.STOP_VIDEO_RECORDING)
                 tts.speak("recording finished", TextToSpeech.QUEUE_FLUSH, null, "")
                 lifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
@@ -295,14 +300,6 @@ class RecorderState(
                 lifecycleOwner.lifecycleScope.launch {
                     recorderMutex.withLock {
                         recorder?.restoreStateAndRebind()
-                    }
-                }
-                if (isKeepRecording.get()) {
-                    // Record next video
-                    lifecycleOwner.lifecycleScope.launch {
-                        recorderMutex.withLock {
-                            recorder?.requestStart()
-                        }
                     }
                 }
             }

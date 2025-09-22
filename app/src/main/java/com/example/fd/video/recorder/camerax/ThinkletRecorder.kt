@@ -64,6 +64,7 @@ internal class ThinkletRecorder private constructor(
 
     @GuardedBy("recordingLock")
     private var recording: Recording? = null
+    private var isPreparing: Boolean = false
     private val previewUseCase: Preview = Preview.Builder().build()
     private val videoCaptureUseCase: VideoCapture<Recorder>
     private val analyzerUseCase: ImageAnalysis?
@@ -81,13 +82,19 @@ internal class ThinkletRecorder private constructor(
         rebindUseCasesAsync()
     }
 
-    fun prepareToRecord(enableVision: Boolean, enablePreview: Boolean) {
+    fun prepareToRecord(enableVision: Boolean, enablePreview: Boolean): Pair<Boolean, Boolean> {
+        if (isPreparing) {
+            return previewEnabledBeforeRecording to visionUseCaseEnabledBeforeRecording
+        }
+        isPreparing = true
         // Force enable all UseCases during recording (outside of lock)
         previewEnabledBeforeRecording = previewEnabled
         visionUseCaseEnabledBeforeRecording = visionUseCaseEnabled
         visionUseCaseEnabled = enableVision
         // Only force enable preview when Surface is available to avoid crashes
         previewEnabled = enablePreview
+        rebindUseCasesAsync()
+        return previewEnabledBeforeRecording to visionUseCaseEnabledBeforeRecording
     }
 
     fun isRecording(): Boolean = recordingLock.withLock { recording != null }
@@ -103,36 +110,36 @@ internal class ThinkletRecorder private constructor(
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     suspend fun startRecording(outputFile: File, outputAudioFile: File): Boolean {
         // Safely rebind all use cases synchronously (in suspend context)
-        performCameraBinding()
+        return cameraBindingLock.withLock {
+            recordingLock.withLock {
+                if (recording != null) {
+                    Logging.w("already recording")
+                    return@withLock false
+                }
 
-        return recordingLock.withLock {
-            if (recording != null) {
-                Logging.w("already recording")
-                return@withLock false
+                Logging.d("write to ${outputFile.absolutePath}")
+                val pendingRecording = recorder
+                    .prepareRecording(
+                        context,
+                        FileOutputOptions
+                            .Builder(outputFile)
+                            .setFileSizeLimit(minOf(fileSize, MAX_FILE_SIZE))
+                            .build()
+                    )
+                    .withAudioEnabled()
+                recording = try {
+                    pendingRecording.start(
+                        recorderListenerExecutor,
+                        Consumer<VideoRecordEvent>(::handleVideoRecordEvent)
+                    )
+                } catch (e: IllegalArgumentException) {
+                    Logging.e("Failed to start recording. $e")
+                    e.printStackTrace()
+                    return@withLock false
+                }
+                rawAudioRecCaptureRepository.startRecording(outputAudioFile)
+                return@withLock true
             }
-
-            Logging.d("write to ${outputFile.absolutePath}")
-            val pendingRecording = recorder
-                .prepareRecording(
-                    context,
-                    FileOutputOptions
-                        .Builder(outputFile)
-                        .setFileSizeLimit(minOf(fileSize, MAX_FILE_SIZE))
-                        .build()
-                )
-                .withAudioEnabled()
-            recording = try {
-                pendingRecording.start(
-                    recorderListenerExecutor,
-                    Consumer<VideoRecordEvent>(::handleVideoRecordEvent)
-                )
-            } catch (e: IllegalArgumentException) {
-                Logging.e("Failed to start recording. $e")
-                e.printStackTrace()
-                return@withLock false
-            }
-            rawAudioRecCaptureRepository.startRecording(outputAudioFile)
-            return@withLock true
         }
     }
 
@@ -141,6 +148,8 @@ internal class ThinkletRecorder private constructor(
             recordingLock.withLock {
                 recording = null
             }
+            // 确保音频录制已停止
+            rawAudioRecCaptureRepository.stopRecording()
         }
         recordEventListener(event)
     }
@@ -221,6 +230,7 @@ internal class ThinkletRecorder private constructor(
         // 通知RecorderState同步preview状态
         onPreviewStateChanged(previewEnabled)
         performCameraBinding()
+        isPreparing = false
     }
 
 
