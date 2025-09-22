@@ -85,6 +85,7 @@ class MainActivity : ComponentActivity() {
         Log.d("ThinkletKeyEvent", "Key pressed - KeyCode: $keyCode, Event: ${event?.toString()}")
         return when (keyCode) {
             KeyEvent.KEYCODE_CAMERA -> {
+                recorderState.prepareToRecord(true, true)
                 recorderState.toggleRecordState()
                 return true
             }

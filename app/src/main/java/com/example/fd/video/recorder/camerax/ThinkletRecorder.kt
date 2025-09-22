@@ -38,6 +38,9 @@ import java.util.concurrent.Executors
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Provides video recording functionality using THINKLET camera
@@ -51,10 +54,13 @@ internal class ThinkletRecorder private constructor(
     private val rawAudioRecCaptureRepository: RawAudioRecCaptureRepository,
     private val cameraProvider: ProcessCameraProvider,
     private val lifecycleOwner: LifecycleOwner,
+    private val setRebinding: (Boolean) -> Unit,
+    private val onPreviewStateChanged: (Boolean) -> Unit,
     private val recorderListenerExecutor: ExecutorService = Executors.newSingleThreadExecutor(),
     private val fileSize: Long = BuildConfig.FILE_SIZE
 ) {
     private val recordingLock: Lock = ReentrantLock()
+    private val cameraBindingLock = Mutex()
 
     @GuardedBy("recordingLock")
     private var recording: Recording? = null
@@ -75,17 +81,27 @@ internal class ThinkletRecorder private constructor(
         rebindUseCasesAsync()
     }
 
-    fun isRecording(): Boolean = recordingLock.withLock { recording != null }
-
-    @RequiresPermission(Manifest.permission.RECORD_AUDIO)
-    suspend fun startRecording(outputFile: File, outputAudioFile: File): Boolean {
+    fun prepareToRecord(enableVision: Boolean, enablePreview: Boolean) {
         // Force enable all UseCases during recording (outside of lock)
         previewEnabledBeforeRecording = previewEnabled
         visionUseCaseEnabledBeforeRecording = visionUseCaseEnabled
-        visionUseCaseEnabled = true
+        visionUseCaseEnabled = enableVision
         // Only force enable preview when Surface is available to avoid crashes
-        previewEnabled = previewUseCase.surfaceProvider != null
-        
+        previewEnabled = enablePreview
+    }
+
+    fun isRecording(): Boolean = recordingLock.withLock { recording != null }
+
+    fun isVisionUseCaseEnabled(): Boolean {
+        return visionUseCaseEnabled
+    }
+
+    fun getUseCaseStatus(): String {
+        return "Preview:$previewEnabled|Vision:$visionUseCaseEnabled|Recording:${isRecording()}"
+    }
+
+    @RequiresPermission(Manifest.permission.RECORD_AUDIO)
+    suspend fun startRecording(outputFile: File, outputAudioFile: File): Boolean {
         // Safely rebind all use cases synchronously (in suspend context)
         performCameraBinding()
 
@@ -164,23 +180,31 @@ internal class ThinkletRecorder private constructor(
 
     @MainThread
     internal fun rebindUseCasesAsync() {
-        ContextCompat.getMainExecutor(context).execute {
+        lifecycleOwner.lifecycleScope.launch {
             performCameraBinding()
         }
     }
 
-    private fun performCameraBinding() {
-        val useCaseGroup = buildUseCaseGroup()
-        camera = runCatching {
-            cameraProvider.unbindAll()
-            cameraProvider.bindToLifecycle(
-                lifecycleOwner,
-                CameraSelector.DEFAULT_BACK_CAMERA,
-                useCaseGroup
-            )
-        }.onFailure {
-            Logging.e("Use case binding failed")
-        }.getOrNull()
+    private suspend fun performCameraBinding() {
+        cameraBindingLock.withLock {
+            setRebinding(true)
+            delay(1000L)
+            withContext(Dispatchers.Main) {
+                val useCaseGroup = buildUseCaseGroup()
+                camera = runCatching {
+                    analyzerUseCase?.clearAnalyzer()
+                    cameraProvider.unbindAll()
+                    cameraProvider.bindToLifecycle(
+                        lifecycleOwner,
+                        CameraSelector.DEFAULT_BACK_CAMERA,
+                        useCaseGroup
+                    )
+                }.onFailure {
+                    Logging.e("Use case binding failed")
+                }.getOrNull()
+            }
+            setRebinding(false)
+        }
     }
 
     private fun buildUseCaseGroup(): UseCaseGroup {
@@ -194,6 +218,8 @@ internal class ThinkletRecorder private constructor(
     internal suspend fun restoreStateAndRebind() = withContext(Dispatchers.Main) {
         previewEnabled = previewEnabledBeforeRecording
         visionUseCaseEnabled = visionUseCaseEnabledBeforeRecording
+        // 通知RecorderState同步preview状态
+        onPreviewStateChanged(previewEnabled)
         performCameraBinding()
     }
 
@@ -213,6 +239,8 @@ internal class ThinkletRecorder private constructor(
          * @param analyzer Camera analyzer
          * @param recordEventListener Listener to receive [VideoRecordEvent] events from CameraX
          * @param rawAudioRecCaptureRepository [RawAudioRecCaptureRepository] for 5-channel audio recording
+         * @param setRebinding Callback to notify when camera rebinding status changes
+         * @param onPreviewStateChanged Callback to notify when preview state changes
          * @param recorderExecutor [ExecutorService] to specify execution thread for [recordEventListener]
          */
         @MainThread
@@ -223,6 +251,8 @@ internal class ThinkletRecorder private constructor(
             analyzer: ImageAnalysis.Analyzer?,
             recordEventListener: (VideoRecordEvent) -> Unit = {},
             rawAudioRecCaptureRepository: RawAudioRecCaptureRepository,
+            setRebinding: (Boolean) -> Unit,
+            onPreviewStateChanged: (Boolean) -> Unit,
             recorderExecutor: ExecutorService = Executors.newSingleThreadExecutor()
         ): ThinkletRecorder? {
             CameraXPatch.apply()
@@ -232,7 +262,6 @@ internal class ThinkletRecorder private constructor(
                 .setQualitySelector(QualitySelector.from(Quality.FHD))
                 .setThinkletMicIfPresent(mic)
                 .build()
-            val videoCaptureUseCase = VideoCapture.Builder(recorder).build()
 
             // Analyzer for Vision functionality
             analyzerUseCase = if (analyzer != null) {
@@ -248,7 +277,9 @@ internal class ThinkletRecorder private constructor(
                 recordEventListener,
                 rawAudioRecCaptureRepository,
                 cameraProvider,
-                lifecycleOwner
+                lifecycleOwner,
+                setRebinding,
+                onPreviewStateChanged
             )
         }
 

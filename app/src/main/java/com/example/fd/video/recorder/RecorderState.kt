@@ -51,6 +51,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import ai.fd.thinklet.camerax.vision.ClientConnectionListener
 import ai.fd.thinklet.camerax.vision.httpserver.VisionRepository
 import androidx.camera.core.CameraState
+import androidx.compose.runtime.mutableStateListOf
 
 /**
  * Class that collaborates with [ThinkletRecorder] to provide UI data and handle UI events
@@ -68,6 +69,14 @@ class RecorderState(
     private val _isRecording: MutableState<Boolean> = mutableStateOf(false)
     val isRecording: Boolean
         get() = _isRecording.value
+
+    private val _isPreviewEnabled: MutableState<Boolean> = mutableStateOf(false)
+    val isPreviewEnabled: Boolean
+        get() = _isPreviewEnabled.value
+
+    private val _isRebinding: MutableState<Boolean> = mutableStateOf(false)
+    val isRebinding: Boolean
+        get() = _isRebinding.value
 
     // true == record next video
     private val isKeepRecording = AtomicBoolean(false)
@@ -157,12 +166,32 @@ class RecorderState(
         tts.shutdown()
     }
 
+    fun setRebinding(rebinding: Boolean) {
+        _isRebinding.value = rebinding
+    }
+
     fun releaseRecorder() {
         lifecycleOwner.lifecycleScope.launch {
             recorderMutex.withLock {
                 recorder?.requestStop()
                 recorder = null
             }
+        }
+    }
+
+    fun setPreviewEnabled(enabled: Boolean) {
+        _isPreviewEnabled.value = enabled
+    }
+
+    private fun syncPreviewState(enabled: Boolean) {
+        _isPreviewEnabled.value = enabled
+    }
+
+    fun getDebugUseCaseStatus(): String {
+        return try {
+            recorder?.getUseCaseStatus() ?: "Camera未初始化"
+        } catch (e: Exception) {
+            "状态获取失败"
         }
     }
 
@@ -177,6 +206,8 @@ class RecorderState(
                         analyzer = vision,
                         rawAudioRecCaptureRepository = rawAudioRecCaptureRepository,
                         recordEventListener = ::handleRecordEvent,
+                        setRebinding = ::setRebinding,
+                        onPreviewStateChanged = ::syncPreviewState,
                     )
                     recorder?.camera?.cameraInfo?.cameraState?.observe(lifecycleOwner) { cameraState ->
                         cameraState.error?.let { error ->
@@ -199,6 +230,17 @@ class RecorderState(
         }
     }
 
+    fun prepareToRecord(enableVision: Boolean, enablePreview: Boolean) {
+        if (enablePreview) {
+            _isPreviewEnabled.value = true
+        }
+        lifecycleOwner.lifecycleScope.launch {
+            recorderMutex.withLock {
+                recorder?.prepareToRecord(enableVision, enablePreview)
+            }
+        }
+    }
+
     fun toggleRecordState() {
         lifecycleOwner.lifecycleScope.launch {
             toggleRecordStateInternal()
@@ -211,6 +253,7 @@ class RecorderState(
         if (_isRecording.value) {
             localRecorder.requestStop()
         } else {
+            recorder?.prepareToRecord(recorder?.isVisionUseCaseEnabled() ?: false, isPreviewEnabled)
             localRecorder.requestStart()
         }
     }

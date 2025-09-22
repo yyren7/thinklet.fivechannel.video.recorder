@@ -41,6 +41,8 @@ import java.net.InetAddress
 import java.nio.ByteOrder
 import android.net.wifi.WifiManager
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.material3.CircularProgressIndicator
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -58,16 +60,10 @@ fun MainScreen(
 
     when {
         permissionState.allPermissionsGranted -> {
-            var showPreview by remember { mutableStateOf(false) }
             val lifecycleOwner = LocalLifecycleOwner.current
             DisposableEffect(lifecycleOwner) {
                 onDispose {
                     recorderState.releaseRecorder()
-                }
-            }
-            SideEffect {
-                if (!showPreview) {
-                    recorderState.setPreviewSurfaceProvider(null)
                 }
             }
 
@@ -76,7 +72,7 @@ fun MainScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Box(modifier = Modifier.weight(0.4f).fillMaxWidth()) {
-                    if (showPreview) {
+                    if (recorderState.isPreviewEnabled) {
                         AndroidView(
                             factory = { context ->
                                 PreviewView(context)
@@ -86,17 +82,44 @@ fun MainScreen(
                                 recorderState.setPreviewSurfaceProvider(previewView.surfaceProvider)
                             }
                         )
+                    } else {
+                        recorderState.setPreviewSurfaceProvider(null)
+                    }
+
+                    if (recorderState.isRebinding) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color(0x80000000)), // Semi-transparent black
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
+                        }
                     }
                 }
 
                 Text(text = if (recorderState.isRecording) "Recording" else "Stopped")
+                
+                // UseCase状态调试信息
+                var useCaseStatus by remember { mutableStateOf("") }
+                LaunchedEffect(Unit) {
+                    while (true) {
+                        useCaseStatus = recorderState.getDebugUseCaseStatus()
+                        delay(1000L)
+                    }
+                }
+                Text(
+                    text = "UseCase状态: $useCaseStatus",
+                    modifier = Modifier.padding(8.dp),
+                    color = Color.Gray
+                )
 
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    Button(onClick = { showPreview = !showPreview }) {
-                        Text(if (showPreview) "Hide Preview" else "Show Preview")
+                    Button(onClick = { recorderState.setPreviewEnabled(!recorderState.isPreviewEnabled) }) {
+                        Text(if (recorderState.isPreviewEnabled) "Hide Preview" else "Show Preview")
                     }
                     Button(onClick = onNavigateToAudioTest) {
                         Text("Audio Test")
