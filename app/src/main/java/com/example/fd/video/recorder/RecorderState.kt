@@ -53,7 +53,7 @@ import ai.fd.thinklet.camerax.vision.httpserver.VisionRepository
 import androidx.camera.core.CameraState
 
 /**
- * [ThinkletRecorder]と連携し、UI用のデータの提供やUIからのイベントを処理するクラス
+ * Class that collaborates with [ThinkletRecorder] to provide UI data and handle UI events
  */
 @SuppressLint("MissingPermission")
 @Stable
@@ -69,7 +69,7 @@ class RecorderState(
     val isRecording: Boolean
         get() = _isRecording.value
 
-    // true == 次の動画を撮影する
+    // true == record next video
     private val isKeepRecording = AtomicBoolean(false)
 
     @GuardedBy("mediaActionSoundMutex")
@@ -251,11 +251,11 @@ class RecorderState(
                 }
                 lifecycleOwner.lifecycleScope.launch {
                     recorderMutex.withLock {
-                        recorder?.rebindUseCases()
+                        recorder?.restoreStateAndRebind()
                     }
                 }
                 if (isKeepRecording.get()) {
-                    // 次の動画を撮影
+                    // Record next video
                     lifecycleOwner.lifecycleScope.launch {
                         recorderMutex.withLock {
                             recorder?.requestStart()
@@ -388,7 +388,7 @@ class RecorderState(
 
     companion object {
         /**
-         * カメラが横向きかどうかを判定する
+         * Determines if the camera is in landscape orientation
          */
         fun isLandscape(context: Context): Boolean {
             val cameraManager = context.getSystemService(CameraManager::class.java)

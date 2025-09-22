@@ -3,6 +3,7 @@ package com.example.fd.video.recorder.camerax
 import ai.fd.thinklet.camerax.ThinkletMic
 import android.Manifest
 import android.content.Context
+import android.widget.Toast
 import androidx.annotation.GuardedBy
 import androidx.annotation.MainThread
 import androidx.annotation.RequiresPermission
@@ -21,11 +22,16 @@ import androidx.camera.video.Recording
 import androidx.camera.video.VideoCapture
 import androidx.camera.video.VideoRecordEvent
 import androidx.camera.view.PreviewView
+import androidx.core.content.ContextCompat
 import androidx.core.util.Consumer
 import androidx.lifecycle.LifecycleOwner
 import com.example.fd.video.recorder.BuildConfig
 import com.example.fd.video.recorder.util.Logging
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.guava.await
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import androidx.lifecycle.lifecycleScope
 import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -34,9 +40,9 @@ import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
 /**
- * THINKLETのカメラを用いた録画機能を提供するクラス
+ * Provides video recording functionality using THINKLET camera
  *
- * インスタンスの作成方法や引数に関しては[create]を参照してください。
+ * For instance creation methods and parameters, refer to [create]
  */
 internal class ThinkletRecorder private constructor(
     private val context: Context,
@@ -58,45 +64,60 @@ internal class ThinkletRecorder private constructor(
     internal var camera: Camera? = null
     private var visionUseCaseEnabled: Boolean
     private var previewEnabled: Boolean
+    private var visionUseCaseEnabledBeforeRecording: Boolean = false
+    private var previewEnabledBeforeRecording: Boolean = false
 
     init {
         videoCaptureUseCase = VideoCapture.Builder(recorder).build()
         analyzerUseCase = Companion.analyzerUseCase
         visionUseCaseEnabled = false
         previewEnabled = false
-        bind()
+        rebindUseCasesAsync()
     }
 
     fun isRecording(): Boolean = recordingLock.withLock { recording != null }
 
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
-    fun startRecording(outputFile: File, outputAudioFile: File): Boolean = recordingLock.withLock {
-        if (recording != null) {
-            Logging.w("already recording")
-            return false
+    suspend fun startRecording(outputFile: File, outputAudioFile: File): Boolean {
+        // Force enable all UseCases during recording (outside of lock)
+        previewEnabledBeforeRecording = previewEnabled
+        visionUseCaseEnabledBeforeRecording = visionUseCaseEnabled
+        visionUseCaseEnabled = true
+        // Only force enable preview when Surface is available to avoid crashes
+        previewEnabled = previewUseCase.surfaceProvider != null
+        
+        // Safely rebind all use cases synchronously (in suspend context)
+        performCameraBinding()
+
+        return recordingLock.withLock {
+            if (recording != null) {
+                Logging.w("already recording")
+                return@withLock false
+            }
+
+            Logging.d("write to ${outputFile.absolutePath}")
+            val pendingRecording = recorder
+                .prepareRecording(
+                    context,
+                    FileOutputOptions
+                        .Builder(outputFile)
+                        .setFileSizeLimit(minOf(fileSize, MAX_FILE_SIZE))
+                        .build()
+                )
+                .withAudioEnabled()
+            recording = try {
+                pendingRecording.start(
+                    recorderListenerExecutor,
+                    Consumer<VideoRecordEvent>(::handleVideoRecordEvent)
+                )
+            } catch (e: IllegalArgumentException) {
+                Logging.e("Failed to start recording. $e")
+                e.printStackTrace()
+                return@withLock false
+            }
+            rawAudioRecCaptureRepository.startRecording(outputAudioFile)
+            return@withLock true
         }
-        Logging.d("write to ${outputFile.absolutePath}")
-        val pendingRecording = recorder
-            .prepareRecording(
-                context,
-                FileOutputOptions
-                    .Builder(outputFile)
-                    .setFileSizeLimit(minOf(fileSize, MAX_FILE_SIZE))
-                    .build()
-            )
-            .withAudioEnabled()
-        recording = try {
-            pendingRecording.start(
-                recorderListenerExecutor,
-                Consumer<VideoRecordEvent>(::handleVideoRecordEvent)
-            )
-        } catch (e: IllegalArgumentException) {
-            Logging.e("Failed to start recording. $e")
-            e.printStackTrace()
-            return false
-        }
-        rawAudioRecCaptureRepository.startRecording(outputAudioFile)
-        return true
     }
 
     private fun handleVideoRecordEvent(event: VideoRecordEvent) {
@@ -121,35 +142,35 @@ internal class ThinkletRecorder private constructor(
         if (previewEnabled == enabled) {
             return
         }
-        previewEnabled = enabled
         if (isRecording()) {
+            Toast.makeText(context, "Settings are frozen during recording", Toast.LENGTH_SHORT).show()
             return
         }
-        bind()
+        previewEnabled = enabled
+        rebindUseCasesAsync()
     }
 
     fun enableVisionUseCase(enabled: Boolean) {
         if (visionUseCaseEnabled == enabled) {
             return
         }
-        visionUseCaseEnabled = enabled
         if (isRecording()) {
+            Toast.makeText(context, "Settings are frozen during recording", Toast.LENGTH_SHORT).show()
             return
         }
-        bind()
-    }
-
-    fun rebindUseCases() {
-        bind()
+        visionUseCaseEnabled = enabled
+        rebindUseCasesAsync()
     }
 
     @MainThread
-    private fun bind() {
-        val useCaseGroup = UseCaseGroup.Builder()
-            .addUseCase(videoCaptureUseCase)
-            .addUseCaseIfPresent(if (visionUseCaseEnabled) analyzerUseCase else null)
-            .addUseCaseIfPresent(if (previewEnabled) previewUseCase else null)
-            .build()
+    internal fun rebindUseCasesAsync() {
+        ContextCompat.getMainExecutor(context).execute {
+            performCameraBinding()
+        }
+    }
+
+    private fun performCameraBinding() {
+        val useCaseGroup = buildUseCaseGroup()
         camera = runCatching {
             cameraProvider.unbindAll()
             cameraProvider.bindToLifecycle(
@@ -162,22 +183,37 @@ internal class ThinkletRecorder private constructor(
         }.getOrNull()
     }
 
+    private fun buildUseCaseGroup(): UseCaseGroup {
+        return UseCaseGroup.Builder()
+            .addUseCase(videoCaptureUseCase)
+            .addUseCaseIfPresent(if (visionUseCaseEnabled) analyzerUseCase else null)
+            .addUseCaseIfPresent(if (previewEnabled) previewUseCase else null)
+            .build()
+    }
+
+    internal suspend fun restoreStateAndRebind() = withContext(Dispatchers.Main) {
+        previewEnabled = previewEnabledBeforeRecording
+        visionUseCaseEnabled = visionUseCaseEnabledBeforeRecording
+        performCameraBinding()
+    }
+
+
     companion object {
 
         const val MAX_FILE_SIZE = 4L * 1000 * 1000 * 1000
         private var analyzerUseCase: ImageAnalysis? = null
 
         /**
-         * [ThinkletRecorder]のインスタンスを作成します
+         * Creates an instance of [ThinkletRecorder]
          *
-         * メインスレッドで起動されているコルーチンから呼び出す必要があります。
+         * Must be called from a coroutine running on the main thread.
          *
-         * @param lifecycleOwner カメラのライフサイクルと紐付ける[LifecycleOwner]
-         * @param mic 使用するTHINKLET独自のマイク機能
-         * @param analyzer カメラAnalyzer
-         * @param recordEventListener CameraX側からの[VideoRecordEvent]イベントを受け取るリスナー
-         * @param rawAudioRecCaptureRepository 5ch音声の録音を行う[RawAudioRecCaptureRepository]
-         * @param recorderExecutor [recordEventListener]の実行スレッドを指定する[ExecutorService]
+         * @param lifecycleOwner [LifecycleOwner] to bind camera lifecycle
+         * @param mic THINKLET proprietary microphone functionality to use
+         * @param analyzer Camera analyzer
+         * @param recordEventListener Listener to receive [VideoRecordEvent] events from CameraX
+         * @param rawAudioRecCaptureRepository [RawAudioRecCaptureRepository] for 5-channel audio recording
+         * @param recorderExecutor [ExecutorService] to specify execution thread for [recordEventListener]
          */
         @MainThread
         suspend fun create(
@@ -198,7 +234,7 @@ internal class ThinkletRecorder private constructor(
                 .build()
             val videoCaptureUseCase = VideoCapture.Builder(recorder).build()
 
-            // Vision機能用のAnalyzer
+            // Analyzer for Vision functionality
             analyzerUseCase = if (analyzer != null) {
                 AnalyzerConfigure(analyzer).build()
             } else {
@@ -216,22 +252,6 @@ internal class ThinkletRecorder private constructor(
             )
         }
 
-        @MainThread
-        private fun bind(
-            cameraProvider: ProcessCameraProvider,
-            lifecycleOwner: LifecycleOwner,
-            useCaseGroup: UseCaseGroup
-        ): Camera? {
-            return runCatching {
-                cameraProvider.bindToLifecycle(
-                    lifecycleOwner,
-                    CameraSelector.DEFAULT_BACK_CAMERA,
-                    useCaseGroup
-                )
-            }.onFailure {
-                Logging.e("Use case binding failed")
-            }.getOrNull()
-        }
 
         private fun Recorder.Builder.setThinkletMicIfPresent(mic: ThinkletMic?): Recorder.Builder =
             if (mic == null) this else setThinkletMic(mic)
