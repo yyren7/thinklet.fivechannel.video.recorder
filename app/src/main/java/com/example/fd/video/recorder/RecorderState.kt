@@ -49,6 +49,9 @@ import java.util.Date
 import java.util.Locale
 import ai.fd.thinklet.camerax.vision.ClientConnectionListener
 import ai.fd.thinklet.camerax.vision.httpserver.VisionRepository
+import ai.fd.thinklet.sdk.led.LedClient
+import android.os.Handler
+import android.os.Looper
 import androidx.camera.core.CameraState
 import androidx.compose.runtime.mutableStateListOf
 
@@ -77,6 +80,17 @@ class RecorderState(
     val isRebinding: Boolean
         get() = _isRebinding.value
 
+    private val ledClient = LedClient(context)
+    private var isLedOn = false
+    private var isBlinking = false
+    private val handler = Handler(Looper.getMainLooper())
+    private val blinkRunnable: Runnable = object : Runnable {
+        override fun run() {
+            isLedOn = !isLedOn
+            ledClient.updateCameraLed(isLedOn)
+            handler.postDelayed(this, 500)
+        }
+    }
     @GuardedBy("mediaActionSoundMutex")
     private var mediaActionSound: MediaActionSound? = null
     private val mediaActionSoundMutex: Mutex = Mutex()
@@ -160,6 +174,22 @@ class RecorderState(
         vision?.stop()
         tts.stop()
         tts.shutdown()
+    }
+
+    private fun startLedBlinking() {
+        if (!isBlinking) {
+            isBlinking = true
+            handler.post(blinkRunnable)
+        }
+    }
+
+    private fun stopLedBlinking() {
+        if (isBlinking) {
+            isBlinking = false
+            handler.removeCallbacks(blinkRunnable)
+            isLedOn = false
+            ledClient.updateCameraLed(false)
+        }
     }
 
     fun setRebinding(rebinding: Boolean) {
@@ -285,6 +315,7 @@ class RecorderState(
                 tts.speak("recording started", TextToSpeech.QUEUE_FLUSH, null, "")
                 lifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
                     _isRecording.value = true
+                    startLedBlinking()
                 }
             }
 
@@ -296,6 +327,7 @@ class RecorderState(
                 tts.speak("recording finished", TextToSpeech.QUEUE_FLUSH, null, "")
                 lifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
                     _isRecording.value = false
+                    stopLedBlinking()
                 }
                 lifecycleOwner.lifecycleScope.launch {
                     recorderMutex.withLock {
@@ -364,7 +396,7 @@ class RecorderState(
         }
         
         // Check if connected to WiFi network
-        val activeNetwork = connectivityManager.activeNetwork
+        val activeNetwork = connectivityManager.activeNetwork ?: return "not connected to wifi"
         val networkCapabilities = connectivityManager.getNetworkCapabilities(activeNetwork)
         val isWifiConnected = networkCapabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ?: false
         
@@ -372,10 +404,9 @@ class RecorderState(
             return "not connected to wifi"
         }
         
-        // Get current connected WiFi information
-        val connectionInfo = wifiManager.connectionInfo
-        val currentSsid = connectionInfo.ssid?.removePrefix("\"")?.removeSuffix("\"") ?: "unknown network"
-        
+        val wifiInfo = networkCapabilities?.transportInfo as? android.net.wifi.WifiInfo
+        val currentSsid = wifiInfo?.ssid?.removePrefix("\"")?.removeSuffix("\"") ?: "unknown network"
+
         // Make WiFi name more pronounceable by spelling it out
         return "connected to wifi ${spellOutWifiName(currentSsid)}"
     }

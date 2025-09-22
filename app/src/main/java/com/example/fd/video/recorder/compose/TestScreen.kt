@@ -27,7 +27,8 @@ fun TestScreen(
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
-    val factory = TestViewModelFactory(context.applicationContext as android.app.Application)
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val factory = TestViewModelFactory(context.applicationContext as android.app.Application, lifecycle)
     val testViewModel: TestViewModel = viewModel(factory = factory)
 
     Column(
@@ -44,11 +45,6 @@ fun TestScreen(
 
         Button(onClick = { testViewModel.toggleLed() }) {
             Text("Toggle LED")
-        }
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Button(onClick = { testViewModel.togglePowerLed() }) {
-            Text("Toggle Power LED")
         }
         Spacer(modifier = Modifier.height(16.dp))
 
