@@ -457,6 +457,13 @@ class RecorderState(
         tts.speak(message, TextToSpeech.QUEUE_FLUSH, null, "battery_network_status")
     }
 
+    /**
+     * Speak power down message via TTS
+     */
+    fun speakPowerDown() {
+        tts.speak("power down", TextToSpeech.QUEUE_FLUSH, null, "power_down")
+    }
+
     companion object {
         /**
          * Determines if the camera is in landscape orientation

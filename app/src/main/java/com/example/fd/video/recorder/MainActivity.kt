@@ -1,6 +1,8 @@
 package com.example.fd.video.recorder
 
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.KeyEvent
 import android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
 import androidx.activity.ComponentActivity
@@ -17,21 +19,34 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import ai.fd.thinklet.sdk.maintenance.launcher.Extension
+import ai.fd.thinklet.sdk.maintenance.power.PowerController
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.content.Context
+import android.os.VibratorManager
+import androidx.core.content.ContextCompat
 
 /**
- * このアプリは，THINKLET向けのCameraXを用いた録画サンプルアプリです．
- * 第２ボタン（Cameraキー）の押下により，録画と録画の停止を行います．
- * 書き出し先ファイルは， `/sdcard/Android/data/com.example.fd.video.recorder/files/` 以下にmp4形式で保存されます．
+ * This is a sample recording application using CameraX for THINKLET.
+ * Press the second button (Camera key) to start and stop recording.
+ * The output file is saved in mp4 format under `/sdcard/Android/data/com.example.fd.video.recorder/files/`.
  */
 class MainActivity : ComponentActivity() {
     private val recorderState: RecorderState by lazy(LazyThreadSafetyMode.NONE) {
         RecorderState(this, this)
     }
+    private val handler = Handler(Looper.getMainLooper())
+    private lateinit var longPressRunnable: Runnable
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // THINKLETの自動起動設定
+        longPressRunnable = Runnable {
+            handlePowerKeyPress()
+        }
+
+        // THINKLET auto-start setting
         try {
             val ext = Extension()
             val (pkg, cls) = ext.configure()
@@ -73,34 +88,90 @@ class MainActivity : ComponentActivity() {
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         return when (keyCode) {
-            KeyEvent.KEYCODE_VOLUME_UP, KeyEvent.KEYCODE_VOLUME_DOWN -> {
-                // 音量キーの押下イベントを消費して、システムの音量調整UIが表示されないようにする
-                true
-            }
+            KeyEvent.KEYCODE_POWER -> handlePowerKeyDown(event)
+            KeyEvent.KEYCODE_VOLUME_UP, KeyEvent.KEYCODE_VOLUME_DOWN -> handleVolumeKeyDown()
             else -> super.onKeyDown(keyCode, event)
         }
+    }
+
+    private fun handlePowerKeyDown(event: KeyEvent?): Boolean {
+        if (event != null && event.repeatCount == 0) {
+            handler.postDelayed(longPressRunnable, 2000)
+        }
+        return true // Consume the event to prevent default behavior like screen off
+    }
+
+    private fun handleVolumeKeyDown(): Boolean {
+        // Consume the volume key press event to prevent the system volume adjustment UI from being displayed
+        return true
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
         Log.d("ThinkletKeyEvent", "Key pressed - KeyCode: $keyCode, Event: ${event?.toString()}")
         return when (keyCode) {
-            KeyEvent.KEYCODE_CAMERA -> {
-                recorderState.prepareToRecord(true, true)
-                recorderState.toggleRecordState()
-                return true
-            }
-
-            KeyEvent.KEYCODE_VOLUME_UP -> {
-                recorderState.speakBatteryAndNetworkStatus()
-                return true
-            }
-
-            KeyEvent.KEYCODE_VOLUME_DOWN -> {
-                // このキーには機能を割り当てず、イベントだけを消費する
-                return true
-            }
-
+            KeyEvent.KEYCODE_CAMERA -> handleCameraKeyPress()
+            KeyEvent.KEYCODE_VOLUME_UP -> handleVolumeUpKeyPress()
+            KeyEvent.KEYCODE_VOLUME_DOWN -> handleVolumeDownKeyUp()
+            KeyEvent.KEYCODE_POWER -> handlePowerKeyUp()
             else -> super.onKeyUp(keyCode, event)
         }
+    }
+
+    private fun handlePowerKeyUp(): Boolean {
+        handler.removeCallbacks(longPressRunnable)
+        return true
+    }
+
+    private fun handleVolumeDownKeyUp(): Boolean {
+        // Do not assign a function to this key, just consume the event
+        return true
+    }
+
+    private fun handleCameraKeyPress(): Boolean {
+        recorderState.prepareToRecord(true, true)
+        recorderState.toggleRecordState()
+        return true
+    }
+
+    private fun handleVolumeUpKeyPress(): Boolean {
+        recorderState.speakBatteryAndNetworkStatus()
+        return true
+    }
+
+    private fun handlePowerKeyPress(): Boolean {
+        Log.d("PowerKey", "Long press on power button detected. Testing vibration.")
+        try {
+            // Vibrate to indicate the key press
+            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vibratorManager =
+                    ContextCompat.getSystemService(this, VibratorManager::class.java)
+                vibratorManager?.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                ContextCompat.getSystemService(this, Vibrator::class.java)
+            }
+            vibrator?.let {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    val timings = longArrayOf(0, 200, 200, 200)
+                    val amplitudes = intArrayOf(0, VibrationEffect.DEFAULT_AMPLITUDE, 0, VibrationEffect.DEFAULT_AMPLITUDE)
+                    it.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
+                } else {
+                    @Suppress("DEPRECATION")
+                    it.vibrate(longArrayOf(0, 200, 200, 200), -1)
+                }
+                Log.d("PowerKey", "Vibration command sent.")
+            }
+        } catch (e: Exception) {
+            Log.e("PowerKey", "Failed to initiate vibration.", e)
+        }
+        recorderState.speakPowerDown()
+        try {
+            // Wait for TTS to finish speaking before shutting down
+            Thread.sleep(1000)
+        } catch (e: InterruptedException) {
+            Log.e("PowerKey", "TTS wait interrupted", e)
+        }
+        PowerController().shutdown(this, wait = 5000 /* max wait 30s */)
+        return true
     }
 }
