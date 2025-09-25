@@ -12,7 +12,7 @@ import android.media.AudioTimestamp
 import androidx.annotation.RequiresApi
 import androidx.annotation.RequiresPermission
 import androidx.camera.video.audio.wrapper.AudioRecordWrapper
-import com.example.fd.video.recorder.camerax.ThinkletAudioRecordWrapperRepository
+import com.example.fd.video.recorder.device.audio.ThinkletAudioRecordWrapperRepository
 import com.example.fd.video.recorder.util.Logging
 import java.nio.ByteBuffer
 import java.util.concurrent.Executor

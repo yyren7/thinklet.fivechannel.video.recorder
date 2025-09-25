@@ -19,6 +19,7 @@ import androidx.camera.video.VideoRecordEvent
 import androidx.core.util.Consumer
 import androidx.lifecycle.LifecycleOwner
 import com.example.fd.video.recorder.BuildConfig
+import com.example.fd.video.recorder.device.audio.RawAudioRecCaptureRepository
 import com.example.fd.video.recorder.util.Logging
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.guava.await

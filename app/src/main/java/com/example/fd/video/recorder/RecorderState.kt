@@ -34,9 +34,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import com.example.fd.video.recorder.camerax.RawAudioRecCaptureRepository
 import com.example.fd.video.recorder.camerax.ThinkletRecorder
 import com.example.fd.video.recorder.camerax.impl.ThinkletAudioRecordWrapperRepositoryImpl
+import com.example.fd.video.recorder.device.audio.RawAudioRecCaptureRepository
 import com.example.fd.video.recorder.util.Logging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation

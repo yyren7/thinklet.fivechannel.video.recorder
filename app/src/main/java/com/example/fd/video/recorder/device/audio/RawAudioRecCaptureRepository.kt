@@ -1,4 +1,4 @@
-package com.example.fd.video.recorder.camerax
+package com.example.fd.video.recorder.device.audio
 
 import com.example.fd.video.recorder.util.Logging
 import kotlinx.coroutines.CoroutineScope
