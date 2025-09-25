@@ -313,7 +313,9 @@ class RecorderState(
         when (event) {
             is VideoRecordEvent.Start -> {
                 playMediaActionSound(MediaActionSound.START_VIDEO_RECORDING)
-                tts.speak("recording started", TextToSpeech.QUEUE_FLUSH, null, "")
+                val message = "recording started"
+                Logging.d("TTS speak: $message")
+                tts.speak(message, TextToSpeech.QUEUE_FLUSH, null, "")
                 lifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
                     _isRecording.value = true
                     startLedBlinking()
@@ -325,7 +327,9 @@ class RecorderState(
                 rawAudioRecCaptureRepository.stopRecording()
                 
                 playMediaActionSound(MediaActionSound.STOP_VIDEO_RECORDING)
-                tts.speak("recording finished", TextToSpeech.QUEUE_FLUSH, null, "")
+                val message = "recording finished"
+                Logging.d("TTS speak: $message")
+                tts.speak(message, TextToSpeech.QUEUE_FLUSH, null, "")
                 lifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
                     _isRecording.value = false
                     stopLedBlinking()
@@ -441,6 +445,7 @@ class RecorderState(
     fun speakBatteryStatus() {
         val batteryPercentage = getBatteryPercentage()
         val message = "battery status: ${batteryPercentage} percentage remaining"
+        Logging.d("TTS speak: $message")
         tts.speak(message, TextToSpeech.QUEUE_FLUSH, null, "battery_status")
     }
 
@@ -450,6 +455,7 @@ class RecorderState(
     fun speakNetworkStatus() {
         val networkStatus = getNetworkStatus()
         val message = "network status: $networkStatus"
+        Logging.d("TTS speak: $message")
         tts.speak(message, TextToSpeech.QUEUE_ADD, null, "network_status")
     }
 
@@ -460,6 +466,7 @@ class RecorderState(
         val batteryPercentage = getBatteryPercentage()
         val networkStatus = getNetworkStatus()
         val message = "battery status: ${batteryPercentage} percentage remaining, network status: $networkStatus"
+        Logging.d("TTS speak: $message")
         tts.speak(message, TextToSpeech.QUEUE_FLUSH, null, "battery_network_status")
     }
 
@@ -467,14 +474,18 @@ class RecorderState(
      * Speak power down message via TTS
      */
     fun speakPowerDown() {
-        tts.speak("power down", TextToSpeech.QUEUE_FLUSH, null, "power_down")
+        val message = "power down"
+        Logging.d("TTS speak: $message")
+        tts.speak(message, TextToSpeech.QUEUE_FLUSH, null, "power_down")
     }
 
     /**
      * Speak application prepared message via TTS
      */
     fun speakApplicationPrepared() {
-        tts.speak("application prepared", TextToSpeech.QUEUE_FLUSH, null, "app_prepared")
+        val message = "application prepared"
+        Logging.d("TTS speak: $message")
+        tts.speak(message, TextToSpeech.QUEUE_FLUSH, null, "app_prepared")
     }
 
     companion object {
