@@ -55,6 +55,7 @@ import android.os.Handler
 import android.os.Looper
 import androidx.camera.core.CameraState
 import androidx.compose.runtime.mutableStateListOf
+import com.example.fd.video.recorder.camerax.UseCaseStatusListener
 
 /**
  * Class that collaborates with [ThinkletRecorder] to provide UI data and handle UI events
@@ -66,7 +67,7 @@ class RecorderState(
     private val lifecycleOwner: LifecycleOwner,
     enableVision: Boolean = BuildConfig.ENABLE_VISION,
     visionPort: Int = BuildConfig.VISION_PORT
-) : TextToSpeech.OnInitListener {
+) : TextToSpeech.OnInitListener, UseCaseStatusListener {
     val isLandscapeCamera: Boolean = isLandscape(context)
 
     private val _isRecording: MutableState<Boolean> = mutableStateOf(false)
@@ -77,9 +78,17 @@ class RecorderState(
     val isPreviewEnabled: Boolean
         get() = _isPreviewEnabled.value
 
+    private val _isStreamingEnabled: MutableState<Boolean> = mutableStateOf(false)
+    val isStreamingEnabled: Boolean
+        get() = _isStreamingEnabled.value
+
     private val _isRebinding: MutableState<Boolean> = mutableStateOf(false)
     val isRebinding: Boolean
         get() = _isRebinding.value
+
+    private val _rebindingCount: MutableState<Int> = mutableStateOf(0)
+    val rebindingCount: Int
+        get() = _rebindingCount.value
 
     private val ledClient = LedClient(context)
     private var isLedOn = false
@@ -142,7 +151,11 @@ class RecorderState(
                     override fun onClientConnected() {
                         lifecycleOwner.lifecycleScope.launch {
                             recorderMutex.withLock {
-                                recorder?.enableVisionUseCase(true)
+                                val success = recorder?.setStreamingEnabled(true) ?: false
+                                if (success) {
+                                    syncStreamingState(true)
+                                }
+                                // 录像期间失败是正常的，会在录像结束后自动处理
                             }
                         }
                     }
@@ -150,7 +163,10 @@ class RecorderState(
                     override fun onClientDisconnected() {
                         lifecycleOwner.lifecycleScope.launch {
                             recorderMutex.withLock {
-                                recorder?.enableVisionUseCase(false)
+                                val success = recorder?.setStreamingEnabled(false) ?: false
+                                if (success) {
+                                    syncStreamingState(false)
+                                }
                             }
                         }
                     }
@@ -195,6 +211,9 @@ class RecorderState(
 
     fun setRebinding(rebinding: Boolean) {
         _isRebinding.value = rebinding
+        if (rebinding) {
+            _rebindingCount.value += 1
+        }
     }
 
     fun releaseRecorder() {
@@ -210,8 +229,16 @@ class RecorderState(
         _isPreviewEnabled.value = enabled
     }
 
+    fun setStreamingEnabled(enabled: Boolean) {
+        _isStreamingEnabled.value = enabled
+    }
+
     private fun syncPreviewState(enabled: Boolean) {
         _isPreviewEnabled.value = enabled
+    }
+
+    private fun syncStreamingState(enabled: Boolean) {
+        _isStreamingEnabled.value = enabled
     }
 
     fun getDebugUseCaseStatus(): String {
@@ -236,10 +263,10 @@ class RecorderState(
                         recordEventListener = ::handleRecordEvent,
                         setRebinding = ::setRebinding,
                         onPreviewStateChanged = ::syncPreviewState,
+                        useCaseStatusListener = this@RecorderState,
                     )
                     recorder?.camera?.cameraInfo?.cameraState?.observe(lifecycleOwner) { cameraState ->
                         cameraState.error?.let { error ->
-                            val cause = error.cause
                             val errorCode = when (error.code) {
                                 CameraState.ERROR_CAMERA_IN_USE -> "ERROR_CAMERA_IN_USE"
                                 CameraState.ERROR_MAX_CAMERAS_IN_USE -> "ERROR_MAX_CAMERAS_IN_USE"
@@ -249,7 +276,7 @@ class RecorderState(
                                 CameraState.ERROR_DO_NOT_DISTURB_MODE_ENABLED -> "ERROR_DO_NOT_DISTURB_MODE_ENABLED"
                                 else -> "UNKNOWN_ERROR"
                             }
-                            Logging.e("Camera state error: $errorCode, cause: ${cause?.message}", cause)
+                            Logging.e("Camera state error: $errorCode, cause: ${error.cause?.message}", error.cause)
                         }
                     }
                 }
@@ -258,25 +285,12 @@ class RecorderState(
         }
     }
 
-    fun prepareToRecord(enableVision: Boolean, enablePreview: Boolean) {
-        if (enablePreview) {
-            _isPreviewEnabled.value = true
-        }
-        lifecycleOwner.lifecycleScope.launch {
-            recorderMutex.withLock {
-                val (previewState, visionState) = recorder?.prepareToRecord(enableVision, enablePreview) ?: (false to false)
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(
-                        context,
-                        "Saved state: Preview=$previewState, Vision=$visionState",
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-            }
-        }
-    }
 
     fun toggleRecordState() {
+        if (isRebinding) {
+            Logging.d("toggleRecordState ignored due to rebinding.")
+            return
+        }
         lifecycleOwner.lifecycleScope.launch {
             toggleRecordStateInternal()
         }
@@ -487,6 +501,25 @@ class RecorderState(
         val message = "application prepared"
         Logging.d("TTS speak: $message")
         tts.speak(message, TextToSpeech.QUEUE_FLUSH, null, "app_prepared")
+    }
+
+    // 实现 UseCaseStatusListener 接口
+    override fun onPreviewStateChanged(enabled: Boolean) {
+        lifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
+            _isPreviewEnabled.value = enabled
+        }
+    }
+
+    override fun onStreamingStateChanged(enabled: Boolean) {
+        lifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
+            _isStreamingEnabled.value = enabled
+        }
+    }
+
+    override fun onRecordingStateChanged(isRecording: Boolean) {
+        lifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
+            _isRecording.value = isRecording
+        }
     }
 
     companion object {

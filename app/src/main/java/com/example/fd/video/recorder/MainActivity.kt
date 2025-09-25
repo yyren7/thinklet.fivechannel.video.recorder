@@ -130,7 +130,6 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleCameraKeyPress(): Boolean {
-        recorderState.prepareToRecord(true, true)
         recorderState.toggleRecordState()
         return true
     }

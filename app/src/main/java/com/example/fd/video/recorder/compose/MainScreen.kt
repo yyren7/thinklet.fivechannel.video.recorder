@@ -43,8 +43,6 @@ import android.net.wifi.WifiManager
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -102,25 +100,31 @@ fun MainScreen(
 
                 Text(text = if (recorderState.isRecording) "Recording" else "Stopped")
                 
-                // UseCase status debug information
-                var useCaseStatus by remember { mutableStateOf("") }
-                LaunchedEffect(Unit) {
-                    while (true) {
-                        useCaseStatus = recorderState.getDebugUseCaseStatus()
-                        delay(1000L)
-                    }
-                }
+                // 响应式UseCase状态显示
                 Text(
-                    text = "UseCase Status: $useCaseStatus",
+                    text = "Preview: ${if (recorderState.isPreviewEnabled) "ON" else "OFF"} | " +
+                          "Streaming: ${if (recorderState.isStreamingEnabled) "ON" else "OFF"} | " +
+                          "Recording: ${if (recorderState.isRecording) "ON" else "OFF"}",
                     modifier = Modifier.padding(8.dp),
                     color = Color.Gray
+                )
+                
+                // Rebinding状态和计数器
+                Text(
+                    text = "Rebinding: ${if (recorderState.isRebinding) "IN PROGRESS" else "IDLE"} | " +
+                          "Count: ${recorderState.rebindingCount}",
+                    modifier = Modifier.padding(8.dp),
+                    color = if (recorderState.isRebinding) Color.Red else Color.Green
                 )
 
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    Button(onClick = { recorderState.setPreviewEnabled(!recorderState.isPreviewEnabled) }) {
+                    Button(
+                        onClick = { recorderState.setPreviewEnabled(!recorderState.isPreviewEnabled) },
+                        enabled = !recorderState.isRebinding
+                    ) {
                         Text(if (recorderState.isPreviewEnabled) "Hide Preview" else "Show Preview")
                     }
                     Button(onClick = onNavigateToTest) {
