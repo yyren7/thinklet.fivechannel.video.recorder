@@ -1,8 +1,12 @@
 package com.example.fd.video.recorder
 
 import android.app.Application
+import android.content.Context
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.VibrationEffect
+import android.os.Vibrator
 import android.speech.tts.TextToSpeech
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
@@ -19,6 +23,7 @@ class TestViewModel(application: Application, lifecycle: Lifecycle) : AndroidVie
     private var isBlinking = false
     private val handler = Handler(Looper.getMainLooper())
     private val tts: TextToSpeech = TextToSpeech(application, this)
+    private val vibrator = application.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
 
     private val blinkRunnable: Runnable = object : Runnable {
         override fun run() {
@@ -52,6 +57,16 @@ class TestViewModel(application: Application, lifecycle: Lifecycle) : AndroidVie
 
     fun playTtsMessage() {
         tts.speak("recording finished", TextToSpeech.QUEUE_FLUSH, null, "")
+    }
+
+    fun vibrate() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(VibrationEffect.createOneShot(500, VibrationEffect.DEFAULT_AMPLITUDE))
+        } else {
+            //deprecated in API 26
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(500)
+        }
     }
 
     override fun onCleared() {

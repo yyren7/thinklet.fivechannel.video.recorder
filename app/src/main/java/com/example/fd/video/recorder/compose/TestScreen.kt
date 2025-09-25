@@ -51,5 +51,10 @@ fun TestScreen(
         Button(onClick = { testViewModel.playTtsMessage() }) {
             Text("Play 'recording finished'")
         }
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(onClick = { testViewModel.vibrate() }) {
+            Text("Vibrate for 0.5s")
+        }
     }
 }
