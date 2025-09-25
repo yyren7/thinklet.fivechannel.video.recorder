@@ -464,6 +464,13 @@ class RecorderState(
         tts.speak("power down", TextToSpeech.QUEUE_FLUSH, null, "power_down")
     }
 
+    /**
+     * Speak application prepared message via TTS
+     */
+    fun speakApplicationPrepared() {
+        tts.speak("application prepared", TextToSpeech.QUEUE_FLUSH, null, "app_prepared")
+    }
+
     companion object {
         /**
          * Determines if the camera is in landscape orientation

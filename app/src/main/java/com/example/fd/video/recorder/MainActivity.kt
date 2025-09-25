@@ -79,6 +79,8 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        vibrate(200)
+        recorderState.speakApplicationPrepared()
     }
 
     override fun onDestroy() {
@@ -140,30 +142,9 @@ class MainActivity : ComponentActivity() {
 
     private fun handlePowerKeyPress(): Boolean {
         Log.d("PowerKey", "Long press on power button detected. Testing vibration.")
-        try {
-            // Vibrate to indicate the key press
-            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val vibratorManager =
-                    ContextCompat.getSystemService(this, VibratorManager::class.java)
-                vibratorManager?.defaultVibrator
-            } else {
-                @Suppress("DEPRECATION")
-                ContextCompat.getSystemService(this, Vibrator::class.java)
-            }
-            vibrator?.let {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    val timings = longArrayOf(0, 200, 200, 200)
-                    val amplitudes = intArrayOf(0, VibrationEffect.DEFAULT_AMPLITUDE, 0, VibrationEffect.DEFAULT_AMPLITUDE)
-                    it.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
-                } else {
-                    @Suppress("DEPRECATION")
-                    it.vibrate(longArrayOf(0, 200, 200, 200), -1)
-                }
-                Log.d("PowerKey", "Vibration command sent.")
-            }
-        } catch (e: Exception) {
-            Log.e("PowerKey", "Failed to initiate vibration.", e)
-        }
+        val timings = longArrayOf(0, 200, 200, 200)
+        val amplitudes = intArrayOf(0, VibrationEffect.DEFAULT_AMPLITUDE, 0, VibrationEffect.DEFAULT_AMPLITUDE)
+        vibrate(timings, amplitudes)
         recorderState.speakPowerDown()
         try {
             // Wait for TTS to finish speaking before shutting down
@@ -171,7 +152,52 @@ class MainActivity : ComponentActivity() {
         } catch (e: InterruptedException) {
             Log.e("PowerKey", "TTS wait interrupted", e)
         }
-        PowerController().shutdown(this, wait = 5000 /* max wait 30s */)
+        PowerController().shutdown(this, wait = 1000 /* max wait 1s */)
         return true
+    }
+
+    private fun getVibrator(): Vibrator? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val vibratorManager =
+                ContextCompat.getSystemService(this, VibratorManager::class.java)
+            vibratorManager?.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            ContextCompat.getSystemService(this, Vibrator::class.java)
+        }
+    }
+
+    private fun vibrate(pattern: LongArray, amplitudes: IntArray) {
+        try {
+            val vibrator = getVibrator()
+            vibrator?.let {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    it.vibrate(VibrationEffect.createWaveform(pattern, amplitudes, -1))
+                } else {
+                    @Suppress("DEPRECATION")
+                    it.vibrate(pattern, -1)
+                }
+                Log.d("Vibration", "Vibration pattern command sent.")
+            }
+        } catch (e: Exception) {
+            Log.e("Vibration", "Failed to initiate vibration.", e)
+        }
+    }
+
+    private fun vibrate(durationMillis: Long) {
+        try {
+            val vibrator = getVibrator()
+            vibrator?.let {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    it.vibrate(VibrationEffect.createOneShot(durationMillis, VibrationEffect.DEFAULT_AMPLITUDE))
+                } else {
+                    @Suppress("DEPRECATION")
+                    it.vibrate(durationMillis)
+                }
+                Log.d("Vibration", "Vibration command sent for ${durationMillis}ms.")
+            }
+        } catch (e: Exception) {
+            Log.e("Vibration", "Failed to initiate vibration.", e)
+        }
     }
 }
