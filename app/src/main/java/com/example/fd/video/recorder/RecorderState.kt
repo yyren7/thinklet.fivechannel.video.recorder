@@ -230,6 +230,7 @@ class RecorderState(
                         context = context,
                         lifecycleOwner = lifecycleOwner,
                         mic = micType(),
+                        micType = BuildConfig.MIC_TYPE,
                         analyzer = vision,
                         rawAudioRecCaptureRepository = rawAudioRecCaptureRepository,
                         recordEventListener = ::handleRecordEvent,

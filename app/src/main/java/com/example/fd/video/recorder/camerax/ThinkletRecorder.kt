@@ -49,6 +49,7 @@ import kotlinx.coroutines.sync.withLock
  */
 internal class ThinkletRecorder private constructor(
     private val context: Context,
+    private val micType: String,
     private val recorder: Recorder,
     private val recordEventListener: (VideoRecordEvent) -> Unit,
     private val rawAudioRecCaptureRepository: RawAudioRecCaptureRepository,
@@ -137,7 +138,9 @@ internal class ThinkletRecorder private constructor(
                     e.printStackTrace()
                     return@withLock false
                 }
-                rawAudioRecCaptureRepository.startRecording(outputAudioFile)
+                if (micType == "raw") {
+                    rawAudioRecCaptureRepository.startRecording(outputAudioFile)
+                }
                 return@withLock true
             }
         }
@@ -149,7 +152,9 @@ internal class ThinkletRecorder private constructor(
                 recording = null
             }
             // Ensure audio recording is stopped
-            rawAudioRecCaptureRepository.stopRecording()
+            if (micType == "raw") {
+                rawAudioRecCaptureRepository.stopRecording()
+            }
         }
         recordEventListener(event)
     }
@@ -157,7 +162,9 @@ internal class ThinkletRecorder private constructor(
     fun requestStop() {
         recordingLock.withLock {
             recording?.close()
-            rawAudioRecCaptureRepository.stopRecording()
+            if (micType == "raw") {
+                rawAudioRecCaptureRepository.stopRecording()
+            }
         }
     }
 
@@ -258,6 +265,7 @@ internal class ThinkletRecorder private constructor(
             context: Context,
             lifecycleOwner: LifecycleOwner,
             mic: ThinkletMic?,
+            micType: String,
             analyzer: ImageAnalysis.Analyzer?,
             recordEventListener: (VideoRecordEvent) -> Unit = {},
             rawAudioRecCaptureRepository: RawAudioRecCaptureRepository,
@@ -283,6 +291,7 @@ internal class ThinkletRecorder private constructor(
             val cameraProvider = ProcessCameraProvider.getInstance(context).await()
             return ThinkletRecorder(
                 context,
+                micType,
                 recorder,
                 recordEventListener,
                 rawAudioRecCaptureRepository,
