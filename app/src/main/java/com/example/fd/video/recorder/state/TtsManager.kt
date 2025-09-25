@@ -11,7 +11,7 @@ import android.speech.tts.TextToSpeech
 import com.example.fd.video.recorder.util.Logging
 import java.util.Locale
 
-class TtsManager(private val context: Context) : TextToSpeech.OnInitListener {
+class TTSManager(private val context: Context) : TextToSpeech.OnInitListener {
     private val tts: TextToSpeech = TextToSpeech(context, this)
 
     override fun onInit(status: Int) {
