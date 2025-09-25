@@ -64,6 +64,8 @@ class MainActivity : ComponentActivity() {
 
         enableEdgeToEdge()
         window.addFlags(FLAG_KEEP_SCREEN_ON)
+        vibrate(200)
+        recorderState.speakApplicationPrepared()
         setContent {
             var showTestScreen by remember { mutableStateOf(false) }
 
@@ -79,8 +81,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        vibrate(200)
-        recorderState.speakApplicationPrepared()
     }
 
     override fun onDestroy() {

@@ -15,6 +15,7 @@ import android.hardware.camera2.CameraManager
 import android.media.AudioManager
 import android.media.MediaActionSound
 import android.os.BatteryManager
+import android.os.Build
 import android.speech.tts.TextToSpeech
 import android.widget.Toast
 import android.net.ConnectivityManager
@@ -403,9 +404,14 @@ class RecorderState(
         if (!isWifiConnected) {
             return "not connected to wifi"
         }
-        
-        val wifiInfo = networkCapabilities?.transportInfo as? android.net.wifi.WifiInfo
-        val currentSsid = wifiInfo?.ssid?.removePrefix("\"")?.removeSuffix("\"") ?: "unknown network"
+
+        val currentSsid = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val wifiInfo = networkCapabilities?.transportInfo as? android.net.wifi.WifiInfo
+            wifiInfo?.ssid?.removePrefix("\"")?.removeSuffix("\"") ?: "unknown network"
+        } else {
+            @Suppress("DEPRECATION")
+            wifiManager.connectionInfo.ssid.removePrefix("\"").removeSuffix("\"")
+        }
 
         // Make WiFi name more pronounceable by spelling it out
         return "connected to wifi ${spellOutWifiName(currentSsid)}"
