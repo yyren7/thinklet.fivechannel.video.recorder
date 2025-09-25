@@ -122,7 +122,7 @@ fun MainScreen(
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     Button(
-                        onClick = { recorderState.setPreviewEnabled(!recorderState.isPreviewEnabled) },
+                        onClick = { recorderState.togglePreviewState() },
                         enabled = !recorderState.isRebinding
                     ) {
                         Text(if (recorderState.isPreviewEnabled) "Hide Preview" else "Show Preview")

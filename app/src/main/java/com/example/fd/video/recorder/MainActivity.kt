@@ -65,7 +65,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         window.addFlags(FLAG_KEEP_SCREEN_ON)
         vibrate(200)
-        recorderState.speakApplicationPrepared()
+        recorderState.ttsManager.speakApplicationPrepared()
         setContent {
             var showTestScreen by remember { mutableStateOf(false) }
 
@@ -135,7 +135,9 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleVolumeUpKeyPress(): Boolean {
-        recorderState.speakBatteryAndNetworkStatus()
+        val statusMessage = recorderState.ttsManager.getBatteryAndNetworkStatusMessage()
+        recorderState.showToast(statusMessage)
+        recorderState.ttsManager.speakBatteryAndNetworkStatus()
         return true
     }
 
@@ -144,7 +146,7 @@ class MainActivity : ComponentActivity() {
         val timings = longArrayOf(0, 200, 200, 200)
         val amplitudes = intArrayOf(0, VibrationEffect.DEFAULT_AMPLITUDE, 0, VibrationEffect.DEFAULT_AMPLITUDE)
         vibrate(timings, amplitudes)
-        recorderState.speakPowerDown()
+        recorderState.ttsManager.speakPowerDown()
         try {
             // Wait for TTS to finish speaking before shutting down
             Thread.sleep(1000)

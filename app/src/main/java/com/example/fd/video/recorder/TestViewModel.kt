@@ -55,7 +55,7 @@ class TestViewModel(application: Application, lifecycle: Lifecycle) : AndroidVie
         }
     }
 
-    fun playTtsMessage() {
+    fun playTTSMessage() {
         val message = "recording finished"
         Log.d("TTS", "TTS speak: $message")
         tts.speak(message, TextToSpeech.QUEUE_FLUSH, null, "")

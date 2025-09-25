@@ -48,7 +48,7 @@ fun TestScreen(
         }
         Spacer(modifier = Modifier.height(16.dp))
 
-        Button(onClick = { testViewModel.playTtsMessage() }) {
+        Button(onClick = { testViewModel.playTTSMessage() }) {
             Text("Play 'recording finished'")
         }
         Spacer(modifier = Modifier.height(16.dp))

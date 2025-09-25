@@ -7,31 +7,24 @@ import android.widget.Toast
 import androidx.annotation.GuardedBy
 import androidx.annotation.RequiresPermission
 import androidx.camera.core.Camera
-import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
-import androidx.camera.core.UseCase
-import androidx.camera.core.UseCaseGroup
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.video.FileOutputOptions
 import androidx.camera.video.Quality
 import androidx.camera.video.QualitySelector
 import androidx.camera.video.Recorder
 import androidx.camera.video.Recording
-import androidx.camera.video.VideoCapture
 import androidx.camera.video.VideoRecordEvent
-import androidx.core.content.ContextCompat
 import androidx.core.util.Consumer
 import androidx.lifecycle.LifecycleOwner
 import com.example.fd.video.recorder.BuildConfig
 import com.example.fd.video.recorder.util.Logging
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -56,11 +49,10 @@ internal class ThinkletRecorder private constructor(
     private val recorder: Recorder,
     private val recordEventListener: (VideoRecordEvent) -> Unit,
     private val rawAudioRecCaptureRepository: RawAudioRecCaptureRepository,
-    private val cameraProvider: ProcessCameraProvider,
-    private val lifecycleOwner: LifecycleOwner,
     private val setRebinding: (Boolean) -> Unit,
-    private val onPreviewStateChanged: (Boolean) -> Unit,
     private val useCaseStatusListener: UseCaseStatusListener? = null,
+    private val useCaseManager: UseCaseManager,
+    private val showToast: (String) -> Unit,
     private val recorderListenerExecutor: ExecutorService = Executors.newSingleThreadExecutor(),
     private val fileSize: Long = BuildConfig.FILE_SIZE
 ) {
@@ -79,22 +71,13 @@ internal class ThinkletRecorder private constructor(
     private var previewEnabledBeforeRecording: Boolean = false
     @GuardedBy("cameraStateLock")
     private var streamingEnabledBeforeRecording: Boolean = false
-
-    private val previewUseCase: Preview = Preview.Builder().build()
-    private val videoCaptureUseCase: VideoCapture<Recorder>
-    private val analyzerUseCase: ImageAnalysis?
     internal var camera: Camera? = null
 
-    init {
-        videoCaptureUseCase = VideoCapture.Builder(recorder).build()
-        analyzerUseCase = Companion.analyzerUseCase
-    }
-
-    suspend fun isRecording(): Boolean = cameraStateLock.withLock isRecordingLock@{ recording != null }
+    suspend fun isRecording(): Boolean = cameraStateLock.withLock { recording != null }
     
     private fun isRecordingUnsafe(): Boolean = recording != null
 
-    suspend fun isStreamingEnabled(): Boolean = cameraStateLock.withLock isStreamingEnabledLock@{ streamingEnabled }
+    suspend fun isStreamingEnabled(): Boolean = cameraStateLock.withLock { streamingEnabled }
 
     fun getUseCaseStatus(): String {
         return "Preview:$previewEnabled|Streaming:$streamingEnabled|Recording:${runCatching { recording != null }.getOrElse { false }}"
@@ -102,9 +85,9 @@ internal class ThinkletRecorder private constructor(
 
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     suspend fun startRecording(outputFile: File, outputAudioFile: File): Boolean {
-        return cameraStateLock.withLock startRecordingLock@{
+        return cameraStateLock.withLock {
             if (isRecordingUnsafe() || isInTransition) {
-                return@startRecordingLock false
+                return@withLock false
             }
             
             isInTransition = true
@@ -145,11 +128,11 @@ internal class ThinkletRecorder private constructor(
                 if (micType == "raw") {
                     rawAudioRecCaptureRepository.startRecording(outputAudioFile)
                 }
-                return@startRecordingLock true
+                return@withLock true
             } catch (e: Exception) {
                 Logging.e("Failed to start recording: $e")
                 recording = null
-                return@startRecordingLock false
+                return@withLock false
             } finally {
                 isInTransition = false
             }
@@ -160,7 +143,7 @@ internal class ThinkletRecorder private constructor(
         if (event is VideoRecordEvent.Finalize) {
             // 使用runBlocking来同步清理recording状态，防止状态不一致
             runBlocking {
-                cameraStateLock.withLock finalizeLock@{
+                cameraStateLock.withLock {
                     recording = null
                 }
             }
@@ -174,7 +157,7 @@ internal class ThinkletRecorder private constructor(
     }
 
     suspend fun requestStop() {
-        cameraStateLock.withLock requestStopLock@{
+        cameraStateLock.withLock {
             recording?.close()
             recording = null
             if (micType == "raw") {
@@ -186,43 +169,43 @@ internal class ThinkletRecorder private constructor(
     }
 
     suspend fun setPreviewSurfaceProvider(surfaceProvider: Preview.SurfaceProvider?): Boolean {
-        return cameraStateLock.withLock setPreviewLock@{
-            previewUseCase.setSurfaceProvider(surfaceProvider)
+        return cameraStateLock.withLock {
+            useCaseManager.previewUseCase.setSurfaceProvider(surfaceProvider)
             
             val enabled = surfaceProvider != null
             if (previewEnabled == enabled) {
-                return@setPreviewLock true
+                return@withLock true
             }
             
             if (isRecordingUnsafe()) {
                 showToast("Settings are frozen during recording")
-                return@setPreviewLock false
+                return@withLock false
             }
             
             previewEnabled = enabled
             // 通知状态变化
             useCaseStatusListener?.onPreviewStateChanged(previewEnabled)
             performCameraBindingUnsafe()
-            return@setPreviewLock true
+            return@withLock true
         }
     }
 
     suspend fun setStreamingEnabled(enabled: Boolean): Boolean {
-        return cameraStateLock.withLock setStreamingLock@{
+        return cameraStateLock.withLock {
             if (streamingEnabled == enabled) {
-                return@setStreamingLock true
+                return@withLock true
             }
             
             if (isRecordingUnsafe()) {
                 showToast("Settings are frozen during recording")
-                return@setStreamingLock false
+                return@withLock false
             }
             
             streamingEnabled = enabled
             // 通知状态变化
             useCaseStatusListener?.onStreamingStateChanged(streamingEnabled)
             performCameraBindingUnsafe()
-            return@setStreamingLock true
+            return@withLock true
         }
     }
 
@@ -233,33 +216,12 @@ internal class ThinkletRecorder private constructor(
     private suspend fun performCameraBindingUnsafe() {
         setRebinding(true)
         delay(500L)
-        withContext(Dispatchers.Main) {
-            val useCaseGroup = buildUseCaseGroup()
-            camera = runCatching {
-                analyzerUseCase?.clearAnalyzer()
-                cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(
-                    lifecycleOwner,
-                    CameraSelector.DEFAULT_BACK_CAMERA,
-                    useCaseGroup
-                )
-            }.onFailure {
-                Logging.e("Use case binding failed: $it")
-            }.getOrNull()
-        }
+        camera = useCaseManager.bindUseCases(previewEnabled, streamingEnabled)
         setRebinding(false)
     }
 
-    private fun buildUseCaseGroup(): UseCaseGroup {
-        return UseCaseGroup.Builder()
-            .addUseCase(videoCaptureUseCase)
-            .addUseCaseIfPresent(if (streamingEnabled) analyzerUseCase else null)
-            .addUseCaseIfPresent(if (previewEnabled) previewUseCase else null)
-            .build()
-    }
-
-    internal suspend fun restoreStateAndRebind() {
-        cameraStateLock.withLock restoreStateLock@{
+    internal suspend fun restoreStateAndRebuild() {
+        cameraStateLock.withLock {
             previewEnabled = previewEnabledBeforeRecording
             streamingEnabled = streamingEnabledBeforeRecording
             // 通知状态变化
@@ -267,15 +229,12 @@ internal class ThinkletRecorder private constructor(
             useCaseStatusListener?.onStreamingStateChanged(streamingEnabled)
             performCameraBindingUnsafe()
         }
-        // Notify RecorderState to sync preview state (outside lock)
-        onPreviewStateChanged(previewEnabled)
     }
 
 
     companion object {
 
         const val MAX_FILE_SIZE = 4L * 1000 * 1000 * 1000
-        private var analyzerUseCase: ImageAnalysis? = null
 
         /**
          * Creates an instance of [ThinkletRecorder]
@@ -286,7 +245,6 @@ internal class ThinkletRecorder private constructor(
          * @param recordEventListener Listener to receive [VideoRecordEvent] events from CameraX
          * @param rawAudioRecCaptureRepository [RawAudioRecCaptureRepository] for 5-channel audio recording
          * @param setRebinding Callback to notify when camera rebinding status changes
-         * @param onPreviewStateChanged Callback to notify when preview state changes
          * @param recorderExecutor [ExecutorService] to specify execution thread for [recordEventListener]
          */
         suspend fun create(
@@ -298,8 +256,8 @@ internal class ThinkletRecorder private constructor(
             recordEventListener: (VideoRecordEvent) -> Unit = {},
             rawAudioRecCaptureRepository: RawAudioRecCaptureRepository,
             setRebinding: (Boolean) -> Unit,
-            onPreviewStateChanged: (Boolean) -> Unit,
             useCaseStatusListener: UseCaseStatusListener? = null,
+            showToast: (String) -> Unit,
             recorderExecutor: ExecutorService = Executors.newSingleThreadExecutor()
         ): ThinkletRecorder? {
             CameraXPatch.apply()
@@ -310,34 +268,24 @@ internal class ThinkletRecorder private constructor(
                 .setThinkletMicIfPresent(mic)
                 .build()
 
-            // Analyzer for Vision functionality
-            analyzerUseCase = if (analyzer != null) {
-                AnalyzerConfigure(analyzer).build()
-            } else {
-                null
-            }
-
             val cameraProvider = ProcessCameraProvider.getInstance(context).await()
+            val useCaseManager = UseCaseManager(recorder, cameraProvider, lifecycleOwner, analyzer)
+
             return ThinkletRecorder(
                 context,
                 micType,
                 recorder,
                 recordEventListener,
                 rawAudioRecCaptureRepository,
-                cameraProvider,
-                lifecycleOwner,
                 setRebinding,
-                onPreviewStateChanged,
-                useCaseStatusListener
+                useCaseStatusListener,
+                useCaseManager,
+                showToast
             )
         }
 
 
         private fun Recorder.Builder.setThinkletMicIfPresent(mic: ThinkletMic?): Recorder.Builder =
             if (mic == null) this else setThinkletMic(mic)
-
-        private fun UseCaseGroup.Builder.addUseCaseIfPresent(
-            useCase: UseCase?
-        ): UseCaseGroup.Builder = if (useCase == null) this else addUseCase(useCase)
     }
 }

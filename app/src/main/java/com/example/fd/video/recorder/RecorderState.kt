@@ -56,6 +56,8 @@ import android.os.Looper
 import androidx.camera.core.CameraState
 import androidx.compose.runtime.mutableStateListOf
 import com.example.fd.video.recorder.camerax.UseCaseStatusListener
+import com.example.fd.video.recorder.state.LedController
+import com.example.fd.video.recorder.state.TTSManager
 
 /**
  * Class that collaborates with [ThinkletRecorder] to provide UI data and handle UI events
@@ -67,7 +69,7 @@ class RecorderState(
     private val lifecycleOwner: LifecycleOwner,
     enableVision: Boolean = BuildConfig.ENABLE_VISION,
     visionPort: Int = BuildConfig.VISION_PORT
-) : TextToSpeech.OnInitListener, UseCaseStatusListener {
+) : UseCaseStatusListener {
     val isLandscapeCamera: Boolean = isLandscape(context)
 
     private val _isRecording: MutableState<Boolean> = mutableStateOf(false)
@@ -90,17 +92,9 @@ class RecorderState(
     val rebindingCount: Int
         get() = _rebindingCount.value
 
-    private val ledClient = LedClient(context)
-    private var isLedOn = false
-    private var isBlinking = false
-    private val handler = Handler(Looper.getMainLooper())
-    private val blinkRunnable: Runnable = object : Runnable {
-        override fun run() {
-            isLedOn = !isLedOn
-            ledClient.updateCameraLed(isLedOn)
-            handler.postDelayed(this, 500)
-        }
-    }
+    private val ledController = LedController(context)
+    val ttsManager = TTSManager(context)
+
     @GuardedBy("mediaActionSoundMutex")
     private var mediaActionSound: MediaActionSound? = null
     private val mediaActionSoundMutex: Mutex = Mutex()
@@ -116,8 +110,6 @@ class RecorderState(
         coroutineScope = lifecycleOwner.lifecycleScope,
         audioRecordWrapperRepository = thinkletAudioRecordWrapperRepository,
     )
-
-    private val tts: TextToSpeech = TextToSpeech(context, this)
 
     init {
         lifecycleOwner.lifecycleScope.launch {
@@ -153,7 +145,7 @@ class RecorderState(
                             recorderMutex.withLock {
                                 val success = recorder?.setStreamingEnabled(true) ?: false
                                 if (success) {
-                                    syncStreamingState(true)
+                                    _isStreamingEnabled.value = true
                                 }
                                 // 录像期间失败是正常的，会在录像结束后自动处理
                             }
@@ -165,7 +157,7 @@ class RecorderState(
                             recorderMutex.withLock {
                                 val success = recorder?.setStreamingEnabled(false) ?: false
                                 if (success) {
-                                    syncStreamingState(false)
+                                    _isStreamingEnabled.value = false
                                 }
                             }
                         }
@@ -181,32 +173,13 @@ class RecorderState(
         }
     }
 
-    override fun onInit(status: Int) {
-        if (status == TextToSpeech.SUCCESS) {
-            tts.language = Locale.ENGLISH
-        }
-    }
-
     fun release() {
         vision?.stop()
-        tts.stop()
-        tts.shutdown()
+        ttsManager.release()
     }
 
-    private fun startLedBlinking() {
-        if (!isBlinking) {
-            isBlinking = true
-            handler.post(blinkRunnable)
-        }
-    }
-
-    private fun stopLedBlinking() {
-        if (isBlinking) {
-            isBlinking = false
-            handler.removeCallbacks(blinkRunnable)
-            isLedOn = false
-            ledClient.updateCameraLed(false)
-        }
+    fun showToast(message: String) {
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
     }
 
     fun setRebinding(rebinding: Boolean) {
@@ -223,22 +196,6 @@ class RecorderState(
                 recorder = null
             }
         }
-    }
-
-    fun setPreviewEnabled(enabled: Boolean) {
-        _isPreviewEnabled.value = enabled
-    }
-
-    fun setStreamingEnabled(enabled: Boolean) {
-        _isStreamingEnabled.value = enabled
-    }
-
-    private fun syncPreviewState(enabled: Boolean) {
-        _isPreviewEnabled.value = enabled
-    }
-
-    private fun syncStreamingState(enabled: Boolean) {
-        _isStreamingEnabled.value = enabled
     }
 
     fun getDebugUseCaseStatus(): String {
@@ -262,8 +219,8 @@ class RecorderState(
                         rawAudioRecCaptureRepository = rawAudioRecCaptureRepository,
                         recordEventListener = ::handleRecordEvent,
                         setRebinding = ::setRebinding,
-                        onPreviewStateChanged = ::syncPreviewState,
                         useCaseStatusListener = this@RecorderState,
+                        showToast = ::showToast
                     )
                     recorder?.camera?.cameraInfo?.cameraState?.observe(lifecycleOwner) { cameraState ->
                         cameraState.error?.let { error ->
@@ -296,6 +253,10 @@ class RecorderState(
         }
     }
 
+    fun togglePreviewState() {
+        _isPreviewEnabled.value = !_isPreviewEnabled.value
+    }
+
     private suspend fun toggleRecordStateInternal() = recorderMutex.withLock {
         val localRecorder = recorder ?: return@withLock
 
@@ -313,9 +274,7 @@ class RecorderState(
             context.getExternalFilesDir(null),
             "${timeStamp}.mp4"
         )
-        withContext(Dispatchers.Main) {
-            Toast.makeText(context, "StartRecord: ${file.absoluteFile}", Toast.LENGTH_LONG).show()
-        }
+        showToast("StartRecord: ${file.absoluteFile}")
         val audioFile = File(
             context.getExternalFilesDir(null),
             "${timeStamp}.raw"
@@ -329,11 +288,10 @@ class RecorderState(
             is VideoRecordEvent.Start -> {
                 playMediaActionSound(MediaActionSound.START_VIDEO_RECORDING)
                 val message = "recording started"
-                Logging.d("TTS speak: $message")
-                tts.speak(message, TextToSpeech.QUEUE_FLUSH, null, "")
+                ttsManager.speak(message)
                 lifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
                     _isRecording.value = true
-                    startLedBlinking()
+                    ledController.startLedBlinking()
                 }
             }
 
@@ -343,15 +301,14 @@ class RecorderState(
                 
                 playMediaActionSound(MediaActionSound.STOP_VIDEO_RECORDING)
                 val message = "recording finished"
-                Logging.d("TTS speak: $message")
-                tts.speak(message, TextToSpeech.QUEUE_FLUSH, null, "")
+                ttsManager.speak(message)
                 lifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
                     _isRecording.value = false
-                    stopLedBlinking()
+                    ledController.stopLedBlinking()
                 }
                 lifecycleOwner.lifecycleScope.launch {
                     recorderMutex.withLock {
-                        recorder?.restoreStateAndRebind()
+                        recorder?.restoreStateAndRebuild()
                     }
                 }
             }
@@ -392,115 +349,6 @@ class RecorderState(
             override fun getAudioRecordWrapperFactory(): ThinkletAudioRecordWrapperFactory? =
                 thinkletAudioRecordWrapperRepository
         }
-    }
-
-    /**
-     * Get current battery percentage
-     */
-    private fun getBatteryPercentage(): Int {
-        val batteryManager = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
-        return batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
-    }
-
-    /**
-     * Get current network status information
-     */
-    @SuppressLint("MissingPermission")
-    private fun getNetworkStatus(): String {
-        val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        
-        // Check if WiFi is enabled
-        if (!wifiManager.isWifiEnabled) {
-            return "wifi is disabled"
-        }
-        
-        // Check if connected to WiFi network
-        val activeNetwork = connectivityManager.activeNetwork ?: return "not connected to wifi"
-        val networkCapabilities = connectivityManager.getNetworkCapabilities(activeNetwork)
-        val isWifiConnected = networkCapabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ?: false
-        
-        if (!isWifiConnected) {
-            return "not connected to wifi"
-        }
-
-        val currentSsid = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val wifiInfo = networkCapabilities?.transportInfo as? android.net.wifi.WifiInfo
-            wifiInfo?.ssid?.removePrefix("\"")?.removeSuffix("\"") ?: "unknown network"
-        } else {
-            @Suppress("DEPRECATION")
-            wifiManager.connectionInfo.ssid.removePrefix("\"").removeSuffix("\"")
-        }
-
-        // Make WiFi name more pronounceable by spelling it out
-        return "connected to wifi ${spellOutWifiName(currentSsid)}"
-    }
-
-    /**
-     * Convert WiFi name to spelled-out format for clearer TTS pronunciation
-     */
-    private fun spellOutWifiName(wifiName: String): String {
-        // Spell out all WiFi names character by character for better pronunciation
-        return wifiName.map { char ->
-            when {
-                char.isLetter() -> char.toString()
-                char.isDigit() -> char.toString()
-                char == '-' -> "dash"
-                char == '_' -> "underscore"
-                char == '.' -> "dot"
-                char == ' ' -> "space"
-                else -> char.toString()
-            }
-        }.joinToString(" ")
-    }
-
-    /**
-     * Speak battery status via TTS
-     */
-    fun speakBatteryStatus() {
-        val batteryPercentage = getBatteryPercentage()
-        val message = "battery status: ${batteryPercentage} percentage remaining"
-        Logging.d("TTS speak: $message")
-        tts.speak(message, TextToSpeech.QUEUE_FLUSH, null, "battery_status")
-    }
-
-    /**
-     * Speak network status via TTS
-     */
-    fun speakNetworkStatus() {
-        val networkStatus = getNetworkStatus()
-        val message = "network status: $networkStatus"
-        Logging.d("TTS speak: $message")
-        tts.speak(message, TextToSpeech.QUEUE_ADD, null, "network_status")
-    }
-
-    /**
-     * Speak both battery and network status via TTS
-     */
-    fun speakBatteryAndNetworkStatus() {
-        val batteryPercentage = getBatteryPercentage()
-        val networkStatus = getNetworkStatus()
-        val message = "battery status: ${batteryPercentage} percentage remaining, network status: $networkStatus"
-        Logging.d("TTS speak: $message")
-        tts.speak(message, TextToSpeech.QUEUE_FLUSH, null, "battery_network_status")
-    }
-
-    /**
-     * Speak power down message via TTS
-     */
-    fun speakPowerDown() {
-        val message = "power down"
-        Logging.d("TTS speak: $message")
-        tts.speak(message, TextToSpeech.QUEUE_FLUSH, null, "power_down")
-    }
-
-    /**
-     * Speak application prepared message via TTS
-     */
-    fun speakApplicationPrepared() {
-        val message = "application prepared"
-        Logging.d("TTS speak: $message")
-        tts.speak(message, TextToSpeech.QUEUE_FLUSH, null, "app_prepared")
     }
 
     // 实现 UseCaseStatusListener 接口
