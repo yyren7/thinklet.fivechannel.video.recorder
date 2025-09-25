@@ -148,7 +148,7 @@ internal class ThinkletRecorder private constructor(
             recordingLock.withLock {
                 recording = null
             }
-            // 确保音频录制已停止
+            // Ensure audio recording is stopped
             rawAudioRecCaptureRepository.stopRecording()
         }
         recordEventListener(event)
@@ -227,7 +227,7 @@ internal class ThinkletRecorder private constructor(
     internal suspend fun restoreStateAndRebind() = withContext(Dispatchers.Main) {
         previewEnabled = previewEnabledBeforeRecording
         visionUseCaseEnabled = visionUseCaseEnabledBeforeRecording
-        // 通知RecorderState同步preview状态
+        // Notify RecorderState to sync preview state
         onPreviewStateChanged(previewEnabled)
         performCameraBinding()
         isPreparing = false

@@ -21,14 +21,14 @@ class Vision : ImageAnalysis.Analyzer {
     }
 
     /**
-     * HTTPサーバーを [port] で起動します．
+     * Starts the HTTP server on [port].
      */
     fun start(port: Int = 8080) {
         visionRepository.start(port)
     }
 
     /**
-     * HTTPサーバーを停止します．
+     * Stops the HTTP server.
      */
     fun stop() {
         visionRepository.stop()

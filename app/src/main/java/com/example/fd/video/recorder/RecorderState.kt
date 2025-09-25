@@ -166,7 +166,7 @@ class RecorderState(
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
-            tts.language = Locale.CHINESE
+            tts.language = Locale.ENGLISH
         }
     }
 
@@ -215,9 +215,9 @@ class RecorderState(
 
     fun getDebugUseCaseStatus(): String {
         return try {
-            recorder?.getUseCaseStatus() ?: "Camera未初始化"
+            recorder?.getUseCaseStatus() ?: "Camera not initialized"
         } catch (e: Exception) {
-            "状态获取失败"
+            "Failed to get status"
         }
     }
 
@@ -266,7 +266,7 @@ class RecorderState(
                 withContext(Dispatchers.Main) {
                     Toast.makeText(
                         context,
-                        "保存的状态: Preview=$previewState, Vision=$visionState",
+                        "Saved state: Preview=$previewState, Vision=$visionState",
                         Toast.LENGTH_LONG
                     ).show()
                 }
@@ -320,7 +320,7 @@ class RecorderState(
             }
 
             is VideoRecordEvent.Finalize -> {
-                // 确保音频录制已停止（双重保险）
+                // Make sure audio recording is stopped
                 rawAudioRecCaptureRepository.stopRecording()
                 
                 playMediaActionSound(MediaActionSound.STOP_VIDEO_RECORDING)

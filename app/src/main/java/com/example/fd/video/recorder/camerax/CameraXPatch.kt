@@ -7,7 +7,7 @@ import androidx.camera.core.CameraXConfig
 import androidx.camera.lifecycle.ProcessCameraProvider
 
 /**
- * CameraX向けのTHINKLETの高速化パッチ
+ * THINKLET acceleration patch for CameraX
  */
 object CameraXPatch {
     private var patched: Boolean = false

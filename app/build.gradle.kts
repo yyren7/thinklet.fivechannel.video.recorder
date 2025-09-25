@@ -17,16 +17,16 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // デフォルトの設定値
-        // 動画の最大ファイルサイズ
+        // Default settings
+        // Maximum video file size
         val fileSize = 1*1000*1000*1000 // 1GB
-        // 録画に使うマイクのタイプ
+        // Microphone type for recording
         val micType = "xfe" // or "5ch" or "xfe" or "raw" or "normal"
-        // プレビューの有効化有無
+        // Enable/disable preview
         val enablePreview = true
-        // Visionの有効化有無
+        // Enable/disable Vision
         val enableVision = true
-        // Visionのサーバーポート
+        // Vision server port
         val visionPort = 8080
 
         buildConfigField("long", "FILE_SIZE", "$fileSize")
@@ -76,22 +76,22 @@ dependencies {
 
     implementation(libs.kotlinx.coroutine.guava)
 
-    // AndroidX標準のCameraXを追加
+    // Add standard AndroidX CameraX
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
-    // 代わりに，THINKLETカスタムのCamera－Videoを追加．
+    // Add THINKLET custom Camera-Video instead.
     implementation(thinkletLibs.camerax.video)
 
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
 
-    // THINKLET向けのマイクを追加
+    // Add microphone for THINKLET
     implementation(thinkletLibs.camerax.mic.core)
     implementation(thinkletLibs.camerax.mic.multi.channel)
     implementation(thinkletLibs.camerax.mic.xfe)
-    // THINKLET向けのSDKを追加
+    // Add SDK for THINKLET
     implementation(thinkletLibs.sdk.audio)
     implementation(thinkletLibs.sdk.led)
     implementation(thinkletLibs.sdk.maintenance)

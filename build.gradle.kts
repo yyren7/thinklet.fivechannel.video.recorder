@@ -12,7 +12,7 @@ plugins {
 allprojects {
     configurations.all {
         resolutionStrategy.dependencySubstitution {
-            // `androidx.camera:camera-video` をTHINKLET向けのライブラリに差し替える
+            // Replace `androidx.camera:camera-video` with the library for THINKLET
             val video = thinkletLibs.camerax.video.get()
             substitute(module("androidx.camera:camera-video"))
                 .using(module("${video.module.group}:${video.module.name}:${video.version}"))

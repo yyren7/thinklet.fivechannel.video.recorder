@@ -102,7 +102,7 @@ fun MainScreen(
 
                 Text(text = if (recorderState.isRecording) "Recording" else "Stopped")
                 
-                // UseCase状态调试信息
+                // UseCase status debug information
                 var useCaseStatus by remember { mutableStateOf("") }
                 LaunchedEffect(Unit) {
                     while (true) {
@@ -111,7 +111,7 @@ fun MainScreen(
                     }
                 }
                 Text(
-                    text = "UseCase状态: $useCaseStatus",
+                    text = "UseCase Status: $useCaseStatus",
                     modifier = Modifier.padding(8.dp),
                     color = Color.Gray
                 )
