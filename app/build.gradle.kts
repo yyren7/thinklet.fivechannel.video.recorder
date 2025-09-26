@@ -25,7 +25,7 @@ android {
         // Enable/disable preview
         val enablePreview = true
         // Enable/disable Vision
-        val enableVision = true
+        val enableVision = false
         // Vision server port
         val visionPort = 8080
 

@@ -9,3 +9,4 @@ interface ThinkletAudioRecordWrapperRepository : ThinkletAudioRecordWrapperFacto
 
     fun setCallback(listener: Listener?)
 }
+
