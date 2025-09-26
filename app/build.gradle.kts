@@ -21,7 +21,7 @@ android {
         // Maximum video file size
         val fileSize = 1*1000*1000*1000 // 1GB
         // Microphone type for recording
-        val micType = "xfe" // or "5ch" or "xfe" or "raw" or "normal"
+        val micType = "raw" // or "5ch" or "xfe" or "raw" or "normal"
         // Enable/disable preview
         val enablePreview = true
         // Enable/disable Vision

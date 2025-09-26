@@ -108,7 +108,7 @@ class RecorderState(
     private val thinkletAudioRecordWrapperRepository = ThinkletAudioRecordWrapperRepositoryImpl()
     private val rawAudioRecCaptureRepository = RawAudioRecCaptureRepository(
         coroutineScope = lifecycleOwner.lifecycleScope,
-        audioRecordWrapperRepository = thinkletAudioRecordWrapperRepository,
+        context = context
     )
 
     init {
