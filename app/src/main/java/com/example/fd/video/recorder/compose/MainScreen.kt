@@ -17,7 +17,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.camera.view.PreviewView
@@ -43,6 +42,7 @@ import android.net.wifi.WifiManager
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.lifecycle.compose.LocalLifecycleOwner
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -54,7 +54,8 @@ fun MainScreen(
     val permissionState = rememberMultiplePermissionsState(
         permissions = listOf(
             Manifest.permission.CAMERA,
-            Manifest.permission.RECORD_AUDIO
+            Manifest.permission.RECORD_AUDIO,
+            Manifest.permission.ACCESS_FINE_LOCATION
         )
     )
 
@@ -155,6 +156,7 @@ fun MainScreen(
     }
 }
 
+@Suppress("DEPRECATION")
 @Composable
 fun WifiInfoView() {
     val context = LocalContext.current

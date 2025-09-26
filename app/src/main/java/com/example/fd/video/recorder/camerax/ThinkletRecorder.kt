@@ -116,7 +116,10 @@ internal class ThinkletRecorder private constructor(
                             .setFileSizeLimit(minOf(fileSize, MAX_FILE_SIZE))
                             .build()
                     )
-                    .withAudioEnabled()
+                    .let { recording ->
+                        // raw模式下禁用CameraX音频，避免与RawAudioRecCaptureRepository竞争
+                        if (micType == "raw") recording else recording.withAudioEnabled()
+                    }
                     
                 recording = pendingRecording.start(
                     recorderListenerExecutor,
@@ -126,6 +129,7 @@ internal class ThinkletRecorder private constructor(
                 // 通知录制状态变化
                 useCaseStatusListener?.onRecordingStateChanged(true)
                 
+                // 只在raw模式下启动原始音频录制
                 if (micType == "raw") {
                     rawAudioRecCaptureRepository.startRecording(outputAudioFile)
                 }

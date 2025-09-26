@@ -334,7 +334,7 @@ class RecorderState(
         return when (mic) {
             "5ch" -> ThinkletMics.FiveCh
             "xfe" -> ThinkletMics.Xfe(checkNotNull(context.getSystemService<AudioManager>()))
-            "raw" -> buildThinkletMic(thinkletAudioRecordWrapperRepository)
+            "raw" -> null // raw模式下，CameraX不使用ThinkletMic，避免与RawAudioRecCaptureRepository竞争
             else -> null
         }
     }
